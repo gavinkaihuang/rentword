@@ -51,9 +51,29 @@ export async function GET(request: Request) {
             if (log.isCorrect) entry.correct += 1;
         });
 
+        // Fetch Time Stats for the day
+        const daySessions = await prisma.studySession.findMany({
+            where: {
+                createdAt: {
+                    gte: startOfDay,
+                    lte: endOfDay
+                }
+            }
+        });
+
+        const timeStats = {
+            learnSeconds: 0,
+            reviewSeconds: 0
+        };
+
+        daySessions.forEach(s => {
+            if (s.type === 'LEARN') timeStats.learnSeconds += s.duration;
+            else if (s.type === 'EXERCISE') timeStats.reviewSeconds += s.duration;
+        });
+
         const result = Array.from(uniqueWords.values());
 
-        return NextResponse.json({ date: dateStr, words: result });
+        return NextResponse.json({ date: dateStr, words: result, timeStats });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

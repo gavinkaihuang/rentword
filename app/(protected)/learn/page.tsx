@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 interface Option {
@@ -43,6 +43,24 @@ function QuizContent() {
     useEffect(() => {
         fetchQuestions();
     }, [mode, from, to]);
+
+    // Time Tracking
+    useEffect(() => {
+        const startTime = Date.now();
+        const type = view === 'preview' ? 'LEARN' : 'EXERCISE';
+
+        return () => {
+            const duration = Math.floor((Date.now() - startTime) / 1000);
+            if (duration > 0) {
+                fetch('/api/log-time', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ duration, type }),
+                    keepalive: true
+                }).catch(e => console.error(e));
+            }
+        };
+    }, [view]);
 
     const fetchQuestions = async () => {
         setLoading(true);

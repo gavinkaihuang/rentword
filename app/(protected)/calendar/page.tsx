@@ -22,6 +22,11 @@ interface ReviewLog {
 export default function CalendarPage() {
     const router = useRouter();
     const [stats, setStats] = useState<Record<string, DayStats>>({});
+
+    // Time Stats State
+    const [monthTime, setMonthTime] = useState<{ learn: number; review: number }>({ learn: 0, review: 0 });
+    const [dayTimeStats, setDayTimeStats] = useState<{ learnSeconds: number; reviewSeconds: number } | null>(null);
+
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [dayDetails, setDayDetails] = useState<{ word: { spelling: string; meaning: string }; attempts: number; correct: number }[]>([]);
     const [loadingDetails, setLoadingDetails] = useState(false);
@@ -32,13 +37,19 @@ export default function CalendarPage() {
 
     useEffect(() => {
         fetchStats();
-    }, []);
+    }, [currentMonth]);
 
     const fetchStats = async () => {
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth() + 1;
         try {
-            const res = await fetch('/api/calendar/stats');
+            const res = await fetch(`/api/calendar/stats?year=${year}&month=${month}`);
             const data = await res.json();
-            setStats(data);
+            setStats(data.dailyStats || {});
+            setMonthTime({
+                learn: data.totalLearnSeconds || 0,
+                review: data.totalReviewSeconds || 0
+            });
         } catch (e) {
             console.error('Failed to fetch stats', e);
         }
@@ -48,11 +59,15 @@ export default function CalendarPage() {
         setSelectedDate(dayStr);
         setLoadingDetails(true);
         setDayDetails([]);
+        setDayTimeStats(null);
         try {
             const res = await fetch(`/api/calendar/day?date=${dayStr}`);
             const data = await res.json();
             if (data.words) {
                 setDayDetails(data.words);
+            }
+            if (data.timeStats) {
+                setDayTimeStats(data.timeStats);
             }
         } catch (e) {
             console.error(e);
@@ -79,6 +94,13 @@ export default function CalendarPage() {
 
     const handleNextMonth = () => {
         setCurrentMonth(new Date(year, month + 1, 1));
+    };
+
+    const formatDuration = (seconds: number) => {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        if (h > 0) return `${h}h ${m}m`;
+        return `${m}m`;
     };
 
     const renderCalendarDays = () => {
@@ -135,7 +157,14 @@ export default function CalendarPage() {
                     <button onClick={() => router.push('/')} className="text-gray-500 hover:text-gray-700 flex items-center gap-2">
                         ← Back Home
                     </button>
-                    <h1 className="text-3xl font-bold text-gray-800">Recitation Calendar</h1>
+                    <div className="text-right">
+                        <h1 className="text-3xl font-bold text-gray-800">Recitation Calendar</h1>
+                        <div className="text-sm text-gray-600 mt-1">
+                            <span className="mr-4">📅 This Month:</span>
+                            <span className="font-bold text-blue-600 mr-2">Study: {formatDuration(monthTime.learn)}</span>
+                            <span className="font-bold text-purple-600">Recite: {formatDuration(monthTime.review)}</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -160,6 +189,24 @@ export default function CalendarPage() {
                         <h2 className="text-xl font-bold mb-4 border-b pb-2">
                             {selectedDate ? `Activity for ${selectedDate}` : 'Select a date'}
                         </h2>
+
+                        {/* Daily Time Stats */}
+                        {selectedDate && dayTimeStats && (
+                            <div className="mb-6 bg-gray-50 p-4 rounded-xl">
+                                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-2">Daily Effort</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-xs text-gray-500">Learning</p>
+                                        <p className="text-lg font-bold text-blue-600">{formatDuration(dayTimeStats.learnSeconds)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500">Recitation</p>
+                                        <p className="text-lg font-bold text-purple-600">{formatDuration(dayTimeStats.reviewSeconds)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {selectedDate && dayDetails.length > 0 && (
                             <div className="mb-4">
                                 <button

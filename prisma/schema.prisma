@@ -11,6 +11,7 @@ model Word {
   id          Int      @id @default(autoincrement())
   spelling    String
   meaning     String
+  phonetic    String?
   orderIndex  Int
   
   userProgress UserProgress[]
@@ -35,4 +36,11 @@ model ReviewLog {
   word      Word     @relation(fields: [wordId], references: [id])
   isCorrect Boolean
   createdAt DateTime @default(now())
+}
+
+model StudySession {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  duration  Int      // Seconds
+  type      String   // 'LEARN' or 'EXERCISE'
 }
