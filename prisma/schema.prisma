@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Word {
+  id          Int      @id @default(autoincrement())
+  spelling    String
+  meaning     String
+  orderIndex  Int
+  
+  userProgress UserProgress[]
+  reviewLogs   ReviewLog[]
+}
+
+model UserProgress {
+  id                 Int       @id @default(autoincrement())
+  wordId             Int
+  word               Word      @relation(fields: [wordId], references: [id])
+  proficiency        Int       @default(0)
+  nextReviewDate     DateTime?
+  lastReviewed       DateTime?
+  consecutiveCorrect Int       @default(0)
+  
+  @@unique([wordId])
+}
+
+model ReviewLog {
+  id        Int      @id @default(autoincrement())
+  wordId    Int
+  word      Word     @relation(fields: [wordId], references: [id])
+  isCorrect Boolean
+  createdAt DateTime @default(now())
+}
