@@ -1,0 +1,42 @@
+Deployment Guide: New Machine Setup
+Follow these steps to set up the RentWord vocabulary application on a new computer.
+
+Prerequisites
+Node.js: Ensure Node.js (version 18+ recommended) is installed.
+Git: Ensure Git is installed.
+Step 1: Clone the Repository
+Open your terminal and clone your repository.
+
+git clone https://github.com/YOUR_USERNAME/rentword.git
+cd rentword
+Step 2: Install Dependencies
+Install the required project libraries.
+
+npm install
+Step 3: Configure Environment
+Create a file named .env in the root directory.
+Add the following content (adjust file:./dev.db if you want the database elsewhere, but default is fine):
+DATABASE_URL="file:./dev.db"
+Note: The database file itself is usually NOT committed to Git to prevent overwriting user data. You will generate a fresh one in the next step.
+Step 4: Initialize Database
+Sync the database schema to verify connections and create the local SQLite file.
+
+npx prisma db push
+npx prisma generate
+Step 5: Build the Application
+Compile the code for production.
+
+npm run build
+Step 6: Start the Server
+Launch the application.
+
+npm run start
+The app should now be accessible at http://localhost:3000.
+
+Optional: Data Import
+If you want to transfer your existing progress from the old machine:
+
+Stop the new server.
+Copy the dev.db file from your old machine's root directory.
+Paste it into the root directory of the new machine (overwrite the empty one).
+Restart the server (npm run start).

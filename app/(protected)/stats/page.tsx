@@ -95,7 +95,7 @@ export default function LetterStatsPage() {
                                                 return null;
                                             }}
                                         />
-                                        <Bar dataKey="percentage" fill="#3b82f6" radius={[0, 4, 4, 0]} background={{ fill: '#f1f5f9', radius: [0, 4, 4, 0] }}>
+                                        <Bar dataKey="percentage" fill="#3b82f6" radius={[0, 4, 4, 0]} background={{ fill: '#f1f5f9', radius: 4 }}>
                                             <LabelList dataKey="percentage" content={renderCustomLabel} />
                                         </Bar>
                                     </BarChart>
