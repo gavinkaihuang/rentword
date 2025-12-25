@@ -366,19 +366,19 @@ function QuizContent() {
 
     if (finished) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-                <h2 className="text-3xl font-bold mb-6 text-green-600">Session Complete!</h2>
-                <p className="mb-6 text-gray-600">You have mastered {masteredIds.size} words.</p>
+            <div className="flex flex-col items-center justify-center min-h-screen bg-[#e1e2e7]">
+                <h2 className="text-3xl font-bold mb-6 text-[#33635c]">Session Complete!</h2>
+                <p className="mb-6 text-[#565f89]">You have mastered {masteredIds.size} words.</p>
                 <div className="flex gap-4">
                     <button
                         onClick={() => { setView('preview'); setFinished(false); }}
-                        className="bg-gray-500 text-white px-6 py-3 rounded-lg font-bold"
+                        className="bg-[#565f89] text-white px-6 py-3 rounded-lg font-bold hover:bg-[#4a5277]"
                     >
                         Review List
                     </button>
                     <button
                         onClick={() => router.push('/')}
-                        className="bg-blue-500 text-white px-6 py-3 rounded-lg font-bold"
+                        className="bg-[#34548a] text-white px-6 py-3 rounded-lg font-bold hover:bg-[#2a4470]"
                     >
                         Return Home
                     </button>
@@ -389,11 +389,11 @@ function QuizContent() {
 
     if (previewQuestions.length === 0 && view === 'preview') {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-                <h2 className="text-2xl font-bold mb-6">No words found.</h2>
+            <div className="flex flex-col items-center justify-center min-h-screen bg-[#e1e2e7]">
+                <h2 className="text-2xl font-bold mb-6 text-[#343b58]">No words found.</h2>
                 <button
                     onClick={() => router.push('/')}
-                    className="bg-blue-500 text-white px-6 py-3 rounded-lg font-bold"
+                    className="bg-[#34548a] text-white px-6 py-3 rounded-lg font-bold hover:bg-[#2a4470]"
                 >
                     Return Home
                 </button>
@@ -405,44 +405,44 @@ function QuizContent() {
     if (view === 'preview') {
         const remainingCount = previewQuestions.length - masteredIds.size;
         return (
-            <div className="min-h-screen bg-gray-50 p-4 md:p-8 flex flex-col items-center">
+            <div className="min-h-screen bg-[#e1e2e7] p-4 md:p-8 flex flex-col items-center">
                 <div className="max-w-6xl w-full">
                     <div className="flex justify-between items-center mb-6">
-                        <button onClick={() => router.push('/')} className="text-gray-500 hover:text-gray-700">
+                        <button onClick={() => router.push('/')} className="text-[#565f89] hover:text-[#343b58]">
                             ← Back
                         </button>
-                        <h1 className="text-2xl font-bold text-gray-800">Word Preview ({previewQuestions.length})</h1>
+                        <h1 className="text-2xl font-bold text-[#343b58]">Word Preview ({previewQuestions.length})</h1>
                         {remainingCount > 0 ? (
                             <div className="flex gap-2">
                                 <button
                                     onClick={startQuiz}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition transform hover:scale-105"
+                                    className="bg-[#34548a] hover:bg-[#2a4470] text-white px-6 py-2 rounded-lg font-bold shadow-lg transition transform hover:scale-105"
                                 >
                                     Start Quiz ({remainingCount} left) →
                                 </button>
                                 <button
                                     onClick={startRecitation}
-                                    className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition transform hover:scale-105"
+                                    className="bg-[#5a4a78] hover:bg-[#483b60] text-white px-6 py-2 rounded-lg font-bold shadow-lg transition transform hover:scale-105"
                                 >
                                     Start Recitation 🧠
                                 </button>
                             </div>
                         ) : (
-                            <span className="text-green-600 font-bold">All Mastered!</span>
+                            <span className="text-[#33635c] font-bold">All Mastered!</span>
                         )}
                     </div>
 
-                    <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 sticky top-4 z-10 border border-blue-100">
+                    <div className="bg-[#f2f3f5] rounded-2xl shadow-lg p-6 mb-6 sticky top-4 z-10 border border-[#c0caf5]">
                         <div className="flex gap-4 justify-center">
                             <button
                                 onClick={() => setHideSpelling(!hideSpelling)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${hideSpelling ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${hideSpelling ? 'bg-[#eec49f] text-[#8f5e15]' : 'bg-[#e1e2e7] text-[#565f89] hover:bg-[#d5d6db]'}`}
                             >
                                 {hideSpelling ? '👁️ Show Spelling' : '🙈 Hide Spelling'}
                             </button>
                             <button
                                 onClick={() => setHideMeaning(!hideMeaning)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${hideMeaning ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${hideMeaning ? 'bg-[#eec49f] text-[#8f5e15]' : 'bg-[#e1e2e7] text-[#565f89] hover:bg-[#d5d6db]'}`}
                             >
                                 {hideMeaning ? '👁️ Show Meaning' : '🙈 Hide Meaning'}
                             </button>
@@ -459,41 +459,41 @@ function QuizContent() {
                             return (
                                 <div
                                     key={q.word.id}
-                                    className={`bg-white rounded-xl p-4 shadow-sm border transition-all ${isMastered ? 'border-green-300 bg-green-50 opacity-80' :
-                                        isLearned ? 'border-blue-300 bg-blue-50 opacity-90' : 'border-gray-200 hover:shadow-md'
+                                    className={`bg-[#d5d6db] rounded-xl p-4 shadow-sm border transition-all ${isMastered ? 'border-[#33635c] bg-[#e9f5f4] opacity-80' :
+                                        isLearned ? 'border-[#34548a] bg-[#eef1f8] opacity-90' : 'border-[#cfc9c2] hover:shadow-md'
                                         }`}
                                 >
                                     <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
                                         <div className="flex flex-col">
                                             <div className="flex items-center">
-                                                <span className="text-gray-400 font-mono mr-6 w-12 text-right text-lg">#{q.word.orderIndex || idx + 1}</span>
+                                                <span className="text-[#9aa5ce] font-mono mr-6 w-12 text-right text-lg">#{q.word.orderIndex || idx + 1}</span>
                                                 <div className="flex flex-col">
                                                     <div className="flex items-center gap-3">
-                                                        <span className={`text-xl font-bold ${hideSpelling && !isMastered && !isLearned ? 'blur-md select-none' : 'text-gray-800'}`}>
+                                                        <span className={`text-xl font-bold ${hideSpelling && !isMastered && !isLearned ? 'blur-md select-none' : 'text-[#343b58]'}`}>
                                                             {q.word.spelling}
                                                         </span>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); toggleLearned(q.word.id); }}
                                                             className={`px-2 py-0.5 rounded text-xs font-bold border transition-colors ${isLearned
-                                                                ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200'
-                                                                : 'bg-white text-gray-400 border-gray-300 hover:border-gray-400 hover:text-gray-600'
+                                                                ? 'bg-[#eef1f8] text-[#34548a] border-[#34548a] hover:bg-[#d0d8e8]'
+                                                                : 'bg-[#d5d6db] text-[#565f89] border-[#cfc9c2] hover:border-[#343b58] hover:text-[#343b58]'
                                                                 }`}
                                                         >
                                                             {isLearned ? '✓ Licensed' : 'Mark Known'}
                                                         </button>
                                                     </div>
                                                     {q.word.phonetic && (
-                                                        <span className="text-gray-500 text-sm mt-1 font-mono">
+                                                        <span className="text-[#565f89] text-sm mt-1 font-mono">
                                                             {q.word.phonetic}
                                                         </span>
                                                     )}
                                                     {mistakeStatus === 'unresolved' && (
-                                                        <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full w-fit mt-1 font-bold">
+                                                        <span className="text-xs bg-[#f4dbd6] text-[#8c4351] px-2 py-0.5 rounded-full w-fit mt-1 font-bold">
                                                             Mistake (Unresolved)
                                                         </span>
                                                     )}
                                                     {mistakeStatus === 'resolved' && (
-                                                        <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full w-fit mt-1 font-bold">
+                                                        <span className="text-xs bg-[#e9f5f4] text-[#33635c] px-2 py-0.5 rounded-full w-fit mt-1 font-bold">
                                                             Mistake (Mastered)
                                                         </span>
                                                     )}
@@ -502,22 +502,26 @@ function QuizContent() {
 
                                             {/* Expanded Info */}
                                             {(q.word.grammar || q.word.example) && (!hideMeaning || isMastered || isLearned) && (
-                                                <div className="mt-3 ml-16 text-sm text-gray-600 space-y-2">
+                                                <div className="mt-3 ml-16 text-sm text-[#565f89] space-y-2">
                                                     {q.word.grammar && (
-                                                        <div className="bg-gray-50 p-2 rounded">
-                                                            <span className="font-bold text-gray-700 block text-xs uppercase mb-1">Common Grammar</span>
-                                                            {q.word.grammar}
+                                                        <div className="bg-[#e1e2e7] p-2 rounded">
+                                                            <span className="font-bold text-[#343b58] block text-xs uppercase mb-1">Common Grammar</span>
+                                                            <ul className="list-disc list-inside">
+                                                                {q.word.grammar.split(/,|，/).map((item, i) => (
+                                                                    <li key={i} className="text-[#565f89]">{item.trim()}</li>
+                                                                ))}
+                                                            </ul>
                                                         </div>
                                                     )}
                                                     {q.word.example && (
-                                                        <div className="bg-gray-50 p-2 rounded italic border-l-2 border-blue-200">
+                                                        <div className="bg-[#e1e2e7] p-2 rounded italic border-l-2 border-[#34548a]">
                                                             {q.word.example}
                                                         </div>
                                                     )}
                                                 </div>
                                             )}
                                         </div>
-                                        <div className={`text-gray-600 ${hideMeaning && !isMastered && !isLearned ? 'blur-md select-none' : ''}`}>
+                                        <div className={`text-[#565f89] ${hideMeaning && !isMastered && !isLearned ? 'blur-md select-none' : ''}`}>
                                             {correctOption?.meaning}
                                         </div>
                                     </div>
@@ -538,38 +542,38 @@ function QuizContent() {
     const totalCount = previewQuestions.length; // Approximate total
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
-            <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-2xl">
-                <div className="flex justify-between text-sm text-gray-400 mb-4">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-[#e1e2e7] p-4">
+            <div className="bg-[#f2f3f5] p-8 rounded-2xl shadow-xl w-full max-w-2xl border border-[#c0caf5]">
+                <div className="flex justify-between text-sm text-[#9aa5ce] mb-4">
                     <span>Active Queue: {queue.length}</span>
                     <span>Mastered: {masteredIds.size} / {totalCount}</span>
                 </div>
                 {/* Progress Bar */}
-                <div className="w-full bg-gray-200 rounded-full h-2 mb-8">
+                <div className="w-full bg-[#d5d6db] rounded-full h-2 mb-8">
                     <div
-                        className="bg-green-500 h-2 rounded-full transition-all duration-500"
+                        className="bg-[#33635c] h-2 rounded-full transition-all duration-500"
                         style={{ width: `${(masteredIds.size / totalCount) * 100}%` }}
                     />
                 </div>
 
                 <div className="text-center mb-10">
-                    <h1 className="text-5xl font-bold text-gray-800 mt-4">
+                    <h1 className="text-5xl font-bold text-[#343b58] mt-4">
                         {currentQ.type === 'reverse' ? currentQ.reversePrompt : currentQ.word.spelling}
                     </h1>
                     {currentQ.type !== 'reverse' && currentQ.word.phonetic && (
-                        <div className="text-gray-500 text-xl mt-2 font-mono">{currentQ.word.phonetic}</div>
+                        <div className="text-[#565f89] text-xl mt-2 font-mono">{currentQ.word.phonetic}</div>
                     )}
                 </div>
 
                 {feedback ? (
-                    <div className={`p-6 rounded-xl text-center mb-6 flex flex-col items-center gap-4 ${feedback.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-50 text-red-800'
+                    <div className={`p-6 rounded-xl text-center mb-6 flex flex-col items-center gap-4 ${feedback.type === 'success' ? 'bg-[#e9f5f4] text-[#33635c]' : 'bg-[#f4dbd6] text-[#8c4351]'
                         }`}>
                         <div className="text-xl font-bold whitespace-pre-wrap">{feedback.message}</div>
 
                         {feedback.type === 'error' && (
                             <button
                                 onClick={() => processNext(currentQ.word.id, false)}
-                                className="mt-4 bg-red-600 text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-red-700 transition-colors w-full md:w-auto"
+                                className="mt-4 bg-[#8c4351] text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-[#723642] transition-colors w-full md:w-auto"
                                 autoFocus
                             >
                                 Continue →
@@ -584,13 +588,9 @@ function QuizContent() {
                                 <button
                                     key={idx}
                                     onClick={() => handleAnswer({ meaning: option.label, isCorrect: option.isCorrect })}
-                                    // Mapping label to meaning to satisfy handleAnswer's expected "Option" type roughly, 
-                                    // or we should update handleAnswer. 
-                                    // Actually handleAnswer expects Option interface. 
-                                    // Let's create a compatible object.
-                                    className="text-left p-4 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition-all text-lg font-medium"
+                                    className="text-left p-4 rounded-xl border border-[#cfc9c2] hover:bg-[#eef1f8] hover:border-[#34548a] transition-all text-lg font-medium text-[#343b58]"
                                 >
-                                    <span className="font-bold mr-3">{String.fromCharCode(65 + idx)}.</span>
+                                    <span className="font-bold mr-3 text-[#34548a]">{String.fromCharCode(65 + idx)}.</span>
                                     {option.label}
                                 </button>
                             ))
@@ -600,9 +600,9 @@ function QuizContent() {
                                 <button
                                     key={idx}
                                     onClick={() => handleAnswer(option)}
-                                    className="text-left p-4 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition-all text-lg font-medium"
+                                    className="text-left p-4 rounded-xl border border-[#cfc9c2] hover:bg-[#eef1f8] hover:border-[#34548a] transition-all text-lg font-medium text-[#343b58]"
                                 >
-                                    <span className="font-bold mr-3">{String.fromCharCode(65 + idx)}.</span>
+                                    <span className="font-bold mr-3 text-[#34548a]">{String.fromCharCode(65 + idx)}.</span>
                                     {option.meaning}
                                 </button>
                             ))
@@ -613,7 +613,7 @@ function QuizContent() {
 
             <button
                 onClick={() => setView('preview')}
-                className="mt-8 text-gray-500 hover:text-gray-800"
+                className="mt-8 text-[#565f89] hover:text-[#343b58]"
             >
                 Pause & Check List
             </button>

@@ -57,12 +57,12 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8">
+    <main className="min-h-screen bg-[#e1e2e7] flex flex-col items-center justify-center p-8">
       <div className="w-full max-w-4xl flex justify-between items-center mb-10">
-        <h1 className="text-4xl font-bold text-blue-600">Vocabulary Master</h1>
+        <h1 className="text-4xl font-bold text-[#34548a]">Vocabulary Master</h1>
         <button
           onClick={handleLogout}
-          className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition shadow-sm"
+          className="px-4 py-2 rounded-lg bg-[#e1e2e7] border border-[#cfc9c2] text-[#565f89] hover:bg-[#f4dbd6] hover:text-[#8c4351] hover:border-[#8c4351] transition shadow-sm"
         >
           Sign Out
         </button>
@@ -70,20 +70,20 @@ export default function Home() {
 
       {/* Resume Task Section */}
       {recentTask && (
-        <div className="w-full max-w-4xl mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 shadow-md flex justify-between items-center">
+        <div className="w-full max-w-4xl mb-8 bg-gradient-to-r from-[#eef1f8] to-[#e9f5f4] border border-[#34548a] rounded-xl p-6 shadow-md flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-bold text-blue-800">🚀 Continue Learning</h2>
-            <p className="text-blue-600">{recentTask.description} ({recentTask.completedCount}/{recentTask.totalCount})</p>
-            <div className="w-48 bg-gray-200 rounded-full h-2 mt-2">
+            <h2 className="text-xl font-bold text-[#34548a]">🚀 Continue Learning</h2>
+            <p className="text-[#565f89]">{recentTask.description} ({recentTask.completedCount}/{recentTask.totalCount})</p>
+            <div className="w-48 bg-[#d5d6db] rounded-full h-2 mt-2">
               <div
-                className="bg-blue-600 h-2 rounded-full"
+                className="bg-[#34548a] h-2 rounded-full"
                 style={{ width: `${(recentTask.completedCount / recentTask.totalCount) * 100}%` }}
               />
             </div>
           </div>
           <button
             onClick={() => router.push(`/learn?taskId=${recentTask.id}`)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-lg"
+            className="bg-[#34548a] hover:bg-[#2a4470] text-white font-bold py-2 px-6 rounded-lg shadow-lg"
           >
             Resume
           </button>
@@ -92,22 +92,22 @@ export default function Home() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
         {/* Mode 1 */}
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex flex-col">
-          <h2 className="text-2xl font-semibold mb-4 text-gray-800">Sequential Learning</h2>
-          <p className="text-gray-600 mb-6 flex-grow">Learn words in order from the dictionary.</p>
+        <div className="bg-[#d5d6db] p-6 rounded-xl shadow-lg border border-[#c0caf5] flex flex-col">
+          <h2 className="text-2xl font-semibold mb-4 text-[#343b58]">Sequential Learning</h2>
+          <p className="text-[#565f89] mb-6 flex-grow">Learn words in order from the dictionary.</p>
 
           <div className="space-y-4 mb-4">
             <input
               type="text"
               placeholder="From (e.g., a)"
-              className="w-full p-2 border rounded"
+              className="w-full p-2 border border-[#cfc9c2] rounded text-[#343b58]"
               value={mode1From}
               onChange={(e) => setMode1From(e.target.value)}
             />
             <input
               type="text"
               placeholder="To (e.g., all)"
-              className="w-full p-2 border rounded"
+              className="w-full p-2 border border-[#cfc9c2] rounded text-[#343b58]"
               value={mode1To}
               onChange={(e) => setMode1To(e.target.value)}
             />
@@ -115,78 +115,78 @@ export default function Home() {
 
           <button
             onClick={startMode1}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg transition"
+            className="w-full bg-[#34548a] hover:bg-[#2a4470] text-white font-bold py-3 rounded-lg transition"
           >
             Start Learning
           </button>
         </div>
 
         {/* Mode 6: Select Words (New 2nd Option) */}
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex flex-col">
-          <h2 className="text-2xl font-semibold mb-4 text-gray-800">Select Words</h2>
-          <p className="text-gray-600 mb-6 flex-grow">Pick specific words from the list to study.</p>
+        <div className="bg-[#d5d6db] p-6 rounded-xl shadow-lg border border-[#c0caf5] flex flex-col">
+          <h2 className="text-2xl font-semibold mb-4 text-[#343b58]">Select Words</h2>
+          <p className="text-[#565f89] mb-6 flex-grow">Pick specific words from the list to study.</p>
           <button
             onClick={() => router.push('/select')}
-            className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-lg mt-auto transition"
+            className="w-full bg-[#5a4a78] hover:bg-[#483b60] text-white font-bold py-3 rounded-lg mt-auto transition"
           >
             Select & Start
           </button>
         </div>
 
         {/* Mode 2 */}
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex flex-col">
-          <h2 className="text-2xl font-semibold mb-4 text-gray-800">Smart Review</h2>
-          <p className="text-gray-600 mb-6 flex-grow">Review words you missed or are due for consolidation.</p>
+        <div className="bg-[#d5d6db] p-6 rounded-xl shadow-lg border border-[#c0caf5] flex flex-col">
+          <h2 className="text-2xl font-semibold mb-4 text-[#343b58]">Smart Review</h2>
+          <p className="text-[#565f89] mb-6 flex-grow">Review words you missed or are due for consolidation.</p>
           <button
             onClick={() => router.push('/learn?mode=2')}
-            className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg mt-auto transition"
+            className="w-full bg-[#33635c] hover:bg-[#29514b] text-white font-bold py-3 rounded-lg mt-auto transition"
           >
             Start Review
           </button>
         </div>
 
         {/* Mode 3 */}
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex flex-col">
-          <h2 className="text-2xl font-semibold mb-4 text-gray-800">Random Practice</h2>
-          <p className="text-gray-600 mb-6 flex-grow">Practice with random words from the entire database.</p>
+        <div className="bg-[#d5d6db] p-6 rounded-xl shadow-lg border border-[#c0caf5] flex flex-col">
+          <h2 className="text-2xl font-semibold mb-4 text-[#343b58]">Random Practice</h2>
+          <p className="text-[#565f89] mb-6 flex-grow">Practice with random words from the entire database.</p>
           <button
             onClick={() => router.push('/learn?mode=3')}
-            className="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 rounded-lg mt-auto transition"
+            className="w-full bg-[#565f89] hover:bg-[#4a5277] text-white font-bold py-3 rounded-lg mt-auto transition"
           >
             Start Random
           </button>
         </div>
 
         {/* Mistake Notebook (New Card) */}
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex flex-col">
-          <h2 className="text-2xl font-semibold mb-4 text-gray-800">Mistake Notebook</h2>
-          <p className="text-gray-600 mb-6 flex-grow">Review your past mistakes and strengthen your memory.</p>
+        <div className="bg-[#d5d6db] p-6 rounded-xl shadow-lg border border-[#c0caf5] flex flex-col">
+          <h2 className="text-2xl font-semibold mb-4 text-[#343b58]">Mistake Notebook</h2>
+          <p className="text-[#565f89] mb-6 flex-grow">Review your past mistakes and strengthen your memory.</p>
           <button
             onClick={() => router.push('/mistakes')}
-            className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg mt-auto transition"
+            className="w-full bg-[#8c4351] hover:bg-[#723642] text-white font-bold py-3 rounded-lg mt-auto transition"
           >
             Open Notebook
           </button>
         </div>
 
         {/* Recitation Calendar Link */}
-        <div className="md:col-span-3 bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex items-center justify-between hover:bg-blue-50 transition cursor-pointer" onClick={() => router.push('/calendar')}>
+        <div className="md:col-span-3 bg-[#d5d6db] p-6 rounded-xl shadow-lg border border-[#c0caf5] flex items-center justify-between hover:bg-[#c9cdd8] transition cursor-pointer" onClick={() => router.push('/calendar')}>
           <div>
-            <h2 className="text-2xl font-semibold text-gray-800">📅 Recitation Calendar</h2>
-            <p className="text-gray-600">View your daily progress and history.</p>
+            <h2 className="text-2xl font-semibold text-[#343b58]">📅 Recitation Calendar</h2>
+            <p className="text-[#565f89]">View your daily progress and history.</p>
           </div>
-          <button className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg transition">
+          <button className="bg-[#34548a] hover:bg-[#2a4470] text-white font-bold py-2 px-6 rounded-lg transition">
             View Calendar
           </button>
         </div>
 
         {/* Letter Statistics Link */}
-        <div className="md:col-span-3 bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex items-center justify-between hover:bg-purple-50 transition cursor-pointer" onClick={() => router.push('/stats')}>
+        <div className="md:col-span-3 bg-[#d5d6db] p-6 rounded-xl shadow-lg border border-[#c0caf5] flex items-center justify-between hover:bg-[#c9cdd8] transition cursor-pointer" onClick={() => router.push('/stats')}>
           <div>
-            <h2 className="text-2xl font-semibold text-gray-800">📊 A-Z Statistics</h2>
-            <p className="text-gray-600">Check your progress by alphabet.</p>
+            <h2 className="text-2xl font-semibold text-[#343b58]">📊 A-Z Statistics</h2>
+            <p className="text-[#565f89]">Check your progress by alphabet.</p>
           </div>
-          <button className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-6 rounded-lg transition">
+          <button className="bg-[#5a4a78] hover:bg-[#483b60] text-white font-bold py-2 px-6 rounded-lg transition">
             View Stats
           </button>
         </div>

@@ -58,18 +58,18 @@ export default function SelectWordsPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col pt-4 pb-24 md:p-8 md:pb-8 relative">
+        <div className="min-h-screen bg-[#e1e2e7] flex flex-col pt-4 pb-24 md:p-8 md:pb-8 relative">
             <div className="max-w-6xl w-full mx-auto px-4 md:px-0">
                 <div className="flex justify-between items-center mb-6">
-                    <button onClick={() => router.push('/')} className="text-gray-500 hover:text-gray-700 font-medium">
+                    <button onClick={() => router.push('/')} className="text-[#565f89] hover:text-[#343b58] font-medium">
                         ← Back Home
                     </button>
-                    <h1 className="text-2xl font-bold text-gray-800">Select Words to Study</h1>
+                    <h1 className="text-2xl font-bold text-[#343b58]">Select Words to Study</h1>
                     <div className="w-20"></div> {/* Spacer */}
                 </div>
 
                 {/* Filter Bar */}
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6 overflow-x-auto">
+                <div className="bg-[#f2f3f5] p-4 rounded-xl shadow-sm border border-[#c0caf5] mb-6 overflow-x-auto">
                     <div className="flex gap-2 min-w-max">
                         {letters.map(letter => (
                             <button
@@ -77,8 +77,8 @@ export default function SelectWordsPage() {
                                 onClick={() => setSelectedLetter(letter)}
                                 className={`w-10 h-10 rounded-lg font-bold text-lg uppercase transition-all
                                     ${selectedLetter === letter
-                                        ? 'bg-blue-600 text-white shadow-md scale-105'
-                                        : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}
+                                        ? 'bg-[#34548a] text-white shadow-md scale-105'
+                                        : 'bg-[#f2f3f5] text-[#565f89] hover:bg-[#e1e2e7]'}
                                 `}
                             >
                                 {letter}
@@ -89,7 +89,7 @@ export default function SelectWordsPage() {
 
                 {/* Word Grid */}
                 {loading ? (
-                    <div className="text-center py-20 text-gray-500">Loading words...</div>
+                    <div className="text-center py-20 text-[#565f89]">Loading words...</div>
                 ) : (
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-20">
                         {words.map(word => {
@@ -100,19 +100,19 @@ export default function SelectWordsPage() {
                                     onClick={() => toggleSelection(word.id)}
                                     className={`p-4 rounded-xl border-2 cursor-pointer transition-all select-none
                                         ${isSelected
-                                            ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
-                                            : 'border-transparent bg-white text-gray-700 hover:border-gray-200 shadow-sm'}
+                                            ? 'border-[#34548a] bg-[#eef1f8] text-[#34548a] shadow-md'
+                                            : 'border-transparent bg-[#f2f3f5] text-[#343b58] hover:border-[#cfc9c2] shadow-sm'}
                                     `}
                                 >
                                     <div className="flex justify-between items-center">
                                         <span className="font-bold text-lg">{word.spelling}</span>
-                                        {isSelected && <span className="text-blue-500">✓</span>}
+                                        {isSelected && <span className="text-[#34548a]">✓</span>}
                                     </div>
                                 </div>
                             );
                         })}
                         {words.length === 0 && (
-                            <div className="col-span-full text-center py-10 text-gray-400">
+                            <div className="col-span-full text-center py-10 text-[#9aa5ce]">
                                 No words found starting with "{selectedLetter.toUpperCase()}".
                             </div>
                         )}
@@ -121,19 +121,19 @@ export default function SelectWordsPage() {
             </div>
 
             {/* Bottom Sticky Action Bar */}
-            <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 p-4 shadow-lg z-50">
+            <div className="fixed bottom-0 left-0 w-full bg-[#f2f3f5] border-t border-[#c0caf5] p-4 shadow-lg z-50">
                 <div className="max-w-6xl mx-auto flex justify-between items-center">
                     <div>
-                        <span className="text-gray-500 text-sm">Selected</span>
-                        <div className="text-2xl font-bold text-blue-600">{selectedIds.size} <span className="text-sm font-normal text-gray-400">words</span></div>
+                        <span className="text-[#565f89] text-sm">Selected</span>
+                        <div className="text-2xl font-bold text-[#34548a]">{selectedIds.size} <span className="text-sm font-normal text-[#9aa5ce]">words</span></div>
                     </div>
                     <button
                         onClick={handleStartLearning}
                         disabled={selectedIds.size === 0}
                         className={`px-8 py-3 rounded-xl font-bold text-lg shadow-lg transition-transform active:scale-95
                             ${selectedIds.size > 0
-                                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
+                                ? 'bg-[#34548a] hover:bg-[#2a4470] text-white'
+                                : 'bg-[#e1e2e7] text-[#9aa5ce] cursor-not-allowed'}
                         `}
                     >
                         Start Learning →

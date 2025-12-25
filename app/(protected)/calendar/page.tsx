@@ -114,7 +114,7 @@ export default function CalendarPage() {
         const calendarDays = [];
         // Empty slots for previous month
         for (let i = 0; i < firstDay; i++) {
-            calendarDays.push(<div key={`empty-${i}`} className="min-h-[4rem] bg-gray-50 border border-gray-100"></div>);
+            calendarDays.push(<div key={`empty-${i}`} className="min-h-[4rem] bg-[#e1e2e7] border border-[#cfc9c2]"></div>);
         }
 
         for (let d = 1; d <= days; d++) {
@@ -127,15 +127,15 @@ export default function CalendarPage() {
                 <div
                     key={dayStr}
                     onClick={() => handleDayClick(dayStr)}
-                    className={`min-h-[4rem] border border-gray-200 p-1.5 cursor-pointer transition-colors relative hover:bg-blue-50 flex flex-col justify-between
-                        ${isSelected ? 'bg-blue-100 ring-2 ring-blue-400 z-10' : 'bg-white'}
+                    className={`min-h-[4rem] border border-[#cfc9c2] p-1.5 cursor-pointer transition-colors relative hover:bg-[#eef1f8] flex flex-col justify-between
+                        ${isSelected ? 'bg-[#eef1f8] ring-2 ring-[#34548a] z-10' : 'bg-white'}
                         ${isToday ? 'font-bold' : ''}
                     `}
                 >
                     <div className="flex justify-between items-start">
-                        <span className={`text-xs ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>{d}</span>
+                        <span className={`text-xs ${isToday ? 'text-[#34548a]' : 'text-[#565f89]'}`}>{d}</span>
                         {stat && (
-                            <span className="text-[10px] font-bold bg-blue-500 text-white rounded-full px-1.5 py-0.5">
+                            <span className="text-[10px] font-bold bg-[#34548a] text-white rounded-full px-1.5 py-0.5">
                                 {stat.total}
                             </span>
                         )}
@@ -143,8 +143,8 @@ export default function CalendarPage() {
 
                     {stat && (
                         <div className="mt-1 flex justify-between text-[10px]">
-                            <span className="text-green-600">✓{stat.correct}</span>
-                            <span className="text-red-500">✗{stat.incorrect}</span>
+                            <span className="text-[#33635c]">✓{stat.correct}</span>
+                            <span className="text-[#8c4351]">✗{stat.incorrect}</span>
                         </div>
                     )}
                 </div>
@@ -154,60 +154,60 @@ export default function CalendarPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col p-4 md:p-8">
+        <div className="min-h-screen bg-[#e1e2e7] flex flex-col p-4 md:p-8">
             <div className="max-w-6xl w-full mx-auto">
                 <div className="flex justify-between items-center mb-8">
-                    <button onClick={() => router.push('/')} className="text-gray-500 hover:text-gray-700 flex items-center gap-2">
+                    <button onClick={() => router.push('/')} className="text-[#565f89] hover:text-[#343b58] flex items-center gap-2">
                         ← Back Home
                     </button>
                     <div className="text-right">
-                        <h1 className="text-3xl font-bold text-gray-800">Recitation Calendar</h1>
-                        <div className="text-sm text-gray-600 mt-1">
+                        <h1 className="text-3xl font-bold text-[#343b58]">Recitation Calendar</h1>
+                        <div className="text-sm text-[#565f89] mt-1">
                             <span className="mr-4">📅 This Month:</span>
-                            <span className="font-bold text-blue-600 mr-2">Study: {formatDuration(monthTime.learn)}</span>
-                            <span className="font-bold text-purple-600">Recite: {formatDuration(monthTime.review)}</span>
+                            <span className="font-bold text-[#34548a] mr-2">Study: {formatDuration(monthTime.learn)}</span>
+                            <span className="font-bold text-[#5a4a78]">Recite: {formatDuration(monthTime.review)}</span>
                         </div>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     {/* Calendar Section */}
-                    <div className="lg:col-span-4 bg-white rounded-2xl shadow-lg p-6 h-fit">
+                    <div className="lg:col-span-4 bg-[#f2f3f5] rounded-2xl shadow-lg p-6 h-fit border border-[#c0caf5]">
                         <div className="flex justify-between items-center mb-4">
-                            <button onClick={handlePrevMonth} className="p-2 hover:bg-gray-100 rounded-lg">←</button>
-                            <h2 className="text-xl font-bold">{monthName}</h2>
-                            <button onClick={handleNextMonth} className="p-2 hover:bg-gray-100 rounded-lg">→</button>
+                            <button onClick={handlePrevMonth} className="p-2 hover:bg-[#e1e2e7] rounded-lg text-[#565f89]">←</button>
+                            <h2 className="text-xl font-bold text-[#343b58]">{monthName}</h2>
+                            <button onClick={handleNextMonth} className="p-2 hover:bg-[#e1e2e7] rounded-lg text-[#565f89]">→</button>
                         </div>
 
-                        <div className="grid grid-cols-7 gap-px mb-2 text-center text-xs font-bold text-gray-400">
+                        <div className="grid grid-cols-7 gap-px mb-2 text-center text-xs font-bold text-[#9aa5ce]">
                             <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
                         </div>
-                        <div className="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-lg overflow-hidden">
+                        <div className="grid grid-cols-7 gap-px bg-[#cfc9c2] border border-[#cfc9c2] rounded-lg overflow-hidden">
                             {renderCalendarDays()}
                         </div>
                     </div>
 
                     {/* Details Section */}
-                    <div className="lg:col-span-8 bg-white rounded-2xl shadow-lg p-6 min-h-[500px]">
-                        <h2 className="text-xl font-bold mb-4 border-b pb-2 flex justify-between items-center">
+                    <div className="lg:col-span-8 bg-[#f2f3f5] rounded-2xl shadow-lg p-6 min-h-[500px] border border-[#c0caf5]">
+                        <h2 className="text-xl font-bold mb-4 border-b border-[#cfc9c2] pb-2 flex justify-between items-center text-[#343b58]">
                             <span>{selectedDate ? `Activity for ${selectedDate}` : 'Select a date'}</span>
                             {selectedDate && dayDetails.length > 0 && (
-                                <span className="text-sm font-normal text-gray-500">{dayDetails.length} words</span>
+                                <span className="text-sm font-normal text-[#565f89]">{dayDetails.length} words</span>
                             )}
                         </h2>
 
                         {/* Daily Time Stats */}
                         {selectedDate && dayTimeStats && (
-                            <div className="mb-6 bg-gray-50 p-4 rounded-xl">
-                                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-2">Daily Effort</h3>
+                            <div className="mb-6 bg-[#f2f3f5] p-4 rounded-xl border border-[#c0caf5]">
+                                <h3 className="text-sm font-bold text-[#565f89] uppercase tracking-wide mb-2">Daily Effort</h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <p className="text-xs text-gray-500">Learning</p>
-                                        <p className="text-lg font-bold text-blue-600">{formatDuration(dayTimeStats.learnSeconds)}</p>
+                                        <p className="text-xs text-[#565f89]">Learning</p>
+                                        <p className="text-lg font-bold text-[#34548a]">{formatDuration(dayTimeStats.learnSeconds)}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500">Recitation</p>
-                                        <p className="text-lg font-bold text-purple-600">{formatDuration(dayTimeStats.reviewSeconds)}</p>
+                                        <p className="text-xs text-[#565f89]">Recitation</p>
+                                        <p className="text-lg font-bold text-[#5a4a78]">{formatDuration(dayTimeStats.reviewSeconds)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -217,7 +217,7 @@ export default function CalendarPage() {
                             <div className="mb-6">
                                 <button
                                     onClick={() => router.push(`/learn?mode=4&date=${selectedDate}`)}
-                                    className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 shadow-sm"
+                                    className="w-full bg-[#34548a] hover:bg-[#2a4470] text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 shadow-sm"
                                 >
                                     <span>🔄</span> Study These Values Again
                                 </button>
@@ -225,45 +225,45 @@ export default function CalendarPage() {
                         )}
 
                         {loadingDetails ? (
-                            <div className="text-gray-500 text-center py-10">Loading details...</div>
+                            <div className="text-[#565f89] text-center py-10">Loading details...</div>
                         ) : selectedDate ? (
                             dayDetails.length > 0 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                                     {dayDetails.map((item, idx) => (
-                                        <div key={idx} className="p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-blue-200 hover:shadow-sm transition-all">
+                                        <div key={idx} className="p-3 bg-[#f2f3f5] rounded-lg border border-[#cfc9c2] hover:border-[#34548a] hover:shadow-sm transition-all">
                                             <div className="flex justify-between items-start mb-1">
                                                 <div className="flex flex-col">
                                                     <div className="flex items-center gap-2">
-                                                        <h3 className="font-bold text-base text-gray-800">{item.word.spelling}</h3>
+                                                        <h3 className="font-bold text-base text-[#343b58]">{item.word.spelling}</h3>
                                                     </div>
                                                     <div className="flex gap-1 mt-1">
                                                         {item.mistakeStatus === 'unresolved' && (
-                                                            <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">
+                                                            <span className="text-[10px] bg-[#f4dbd6] text-[#8c4351] px-1.5 py-0.5 rounded-full font-bold">
                                                                 Mistake
                                                             </span>
                                                         )}
                                                         {item.mistakeStatus === 'resolved' && (
-                                                            <span className="text-[10px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full font-bold">
+                                                            <span className="text-[10px] bg-[#e9f5f4] text-[#33635c] px-1.5 py-0.5 rounded-full font-bold">
                                                                 Resolved
                                                             </span>
                                                         )}
                                                     </div>
                                                 </div>
-                                                <div className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-200 text-gray-700 whitespace-nowrap">
+                                                <div className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#e1e2e7] text-[#565f89] whitespace-nowrap">
                                                     {item.correct}/{item.attempts}
                                                 </div>
                                             </div>
-                                            <p className="text-xs text-gray-600 line-clamp-2 mt-1">{item.word.meaning}</p>
+                                            <p className="text-xs text-[#565f89] line-clamp-2 mt-1">{item.word.meaning}</p>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <div className="text-gray-500 text-center py-10">
+                                <div className="text-[#565f89] text-center py-10">
                                     No recitation history found for this day.
                                 </div>
                             )
                         ) : (
-                            <div className="text-gray-500 text-center py-10 flex flex-col items-center">
+                            <div className="text-[#565f89] text-center py-10 flex flex-col items-center">
                                 <div className="text-4xl mb-2">👈</div>
                                 <p>Click on a date in the calendar to view recitation details.</p>
                             </div>

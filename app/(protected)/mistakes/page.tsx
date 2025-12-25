@@ -74,32 +74,32 @@ export default function MistakeNotebook() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col p-4 md:p-8">
+        <div className="min-h-screen bg-[#e1e2e7] flex flex-col p-4 md:p-8">
             <div className="max-w-5xl w-full mx-auto">
                 <div className="flex justify-between items-center mb-8">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => router.push('/')} className="text-gray-500 hover:text-gray-700 flex items-center gap-2">
+                        <button onClick={() => router.push('/')} className="text-[#565f89] hover:text-[#343b58] flex items-center gap-2">
                             ← Back Home
                         </button>
                     </div>
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => router.push('/learn?mode=7')}
-                            className="mr-3 px-6 py-2 rounded-lg font-bold bg-purple-500 hover:bg-purple-600 text-white transition flex items-center gap-2 shadow-lg"
+                            className="mr-3 px-6 py-2 rounded-lg font-bold bg-[#5a4a78] hover:bg-[#483b60] text-white transition flex items-center gap-2 shadow-lg"
                         >
                             <span>🧠</span> Smart Review (All)
                         </button>
                     </div>
                 </div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-6">📕 Mistake Notebook</h1>
+                <h1 className="text-3xl font-bold text-[#343b58] mb-6">📕 Mistake Notebook</h1>
 
                 {/* Tabs */}
-                <div className="flex gap-4 mb-6 border-b border-gray-200">
+                <div className="flex gap-4 mb-6 border-b border-[#cfc9c2]">
                     <button
                         onClick={() => { setStatus('unmastered'); setPage(1); }}
                         className={`pb-2 px-4 font-bold transition-all border-b-2 ${status === 'unmastered'
-                            ? 'border-blue-500 text-blue-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                            ? 'border-[#34548a] text-[#34548a]'
+                            : 'border-transparent text-[#9aa5ce] hover:text-[#565f89]'
                             }`}
                     >
                         😟 Unresolved (Need Practice)
@@ -107,25 +107,25 @@ export default function MistakeNotebook() {
                     <button
                         onClick={() => { setStatus('mastered'); setPage(1); }}
                         className={`pb-2 px-4 font-bold transition-all border-b-2 ${status === 'mastered'
-                            ? 'border-green-500 text-green-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                            ? 'border-[#33635c] text-[#33635c]'
+                            : 'border-transparent text-[#9aa5ce] hover:text-[#565f89]'
                             }`}
                     >
                         😎 Resolved (Mastered)
                     </button>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-lg p-6">
+                <div className="bg-[#f2f3f5] rounded-2xl shadow-lg p-6 border border-[#c0caf5]">
                     <div className="flex justify-between items-center mb-4">
-                        <div className="text-gray-600">
-                            Selected: <span className="font-bold text-blue-600">{selectedIds.size}</span> words
+                        <div className="text-[#565f89]">
+                            Selected: <span className="font-bold text-[#34548a]">{selectedIds.size}</span> words
                         </div>
 
                         <button
                             onClick={handleReview}
                             disabled={selectedIds.size === 0}
                             className={`px-6 py-2 rounded-lg font-bold transition
-                                ${selectedIds.size > 0 ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
+                                ${selectedIds.size > 0 ? 'bg-[#34548a] hover:bg-[#2a4470] text-white' : 'bg-[#e1e2e7] text-[#9aa5ce] cursor-not-allowed'}
                             `}
                         >
                             Review Selected
@@ -133,12 +133,12 @@ export default function MistakeNotebook() {
                     </div>
 
                     {loading ? (
-                        <div className="text-center py-10 text-gray-500">Loading mistakes...</div>
+                        <div className="text-center py-10 text-[#565f89]">Loading mistakes...</div>
                     ) : mistakes.length > 0 ? (
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="border-b border-gray-100 text-gray-500 text-sm">
+                                    <tr className="border-b border-[#cfc9c2] text-[#9aa5ce] text-sm">
                                         <th className="p-3 w-10">
                                             <input
                                                 type="checkbox"
@@ -154,7 +154,7 @@ export default function MistakeNotebook() {
                                 </thead>
                                 <tbody>
                                     {mistakes.map((mistake) => (
-                                        <tr key={mistake.wordId} className="border-b border-gray-50 hover:bg-gray-50 transition">
+                                        <tr key={mistake.wordId} className="border-b border-[#f2f3f5] hover:bg-[#e1e2e7] transition text-[#343b58]">
                                             <td className="p-3">
                                                 <input
                                                     type="checkbox"
@@ -162,14 +162,14 @@ export default function MistakeNotebook() {
                                                     onChange={() => handleSelect(mistake.wordId)}
                                                 />
                                             </td>
-                                            <td className="p-3 font-bold text-gray-800">{mistake.spelling}</td>
-                                            <td className="p-3 text-gray-600">{mistake.meaning}</td>
+                                            <td className="p-3 font-bold">{mistake.spelling}</td>
+                                            <td className="p-3 text-[#565f89]">{mistake.meaning}</td>
                                             <td className="p-3 text-center">
-                                                <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded text-xs font-bold">
+                                                <span className="bg-[#f4dbd6] text-[#8c4351] px-2 py-0.5 rounded text-xs font-bold">
                                                     {mistake.errorCount}
                                                 </span>
                                             </td>
-                                            <td className="p-3 text-right text-sm text-gray-500">
+                                            <td className="p-3 text-right text-sm text-[#9aa5ce]">
                                                 {new Date(mistake.lastErrorDate).toLocaleString()}
                                             </td>
                                         </tr>
@@ -178,9 +178,9 @@ export default function MistakeNotebook() {
                             </table>
                         </div>
                     ) : (
-                        <div className="text-center py-20 text-gray-500">
+                        <div className="text-center py-20 text-[#565f89]">
                             <div className="text-4xl mb-4">🎉</div>
-                            <h3 className="text-xl font-bold text-gray-800 mb-2">No mistakes found!</h3>
+                            <h3 className="text-xl font-bold text-[#343b58] mb-2">No mistakes found!</h3>
                             <p>You haven't made any mistakes yet, or your mistak history is empty.</p>
                         </div>
                     )}
@@ -191,17 +191,17 @@ export default function MistakeNotebook() {
                             <button
                                 onClick={() => setPage(p => Math.max(1, p - 1))}
                                 disabled={page === 1}
-                                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
+                                className="px-3 py-1 border border-[#cfc9c2] rounded hover:bg-[#e1e2e7] disabled:opacity-50 text-[#343b58]"
                             >
                                 Previous
                             </button>
-                            <span className="px-3 py-1 text-gray-600">
+                            <span className="px-3 py-1 text-[#565f89]">
                                 Page {page} of {totalPages}
                             </span>
                             <button
                                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                                 disabled={page === totalPages}
-                                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
+                                className="px-3 py-1 border border-[#cfc9c2] rounded hover:bg-[#e1e2e7] disabled:opacity-50 text-[#343b58]"
                             >
                                 Next
                             </button>
