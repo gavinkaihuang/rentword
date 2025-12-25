@@ -9,12 +9,19 @@ interface Option {
 }
 
 interface Question {
+    type?: 'standard' | 'reverse'; // 'standard': word->meaning, 'reverse': meaning->word
     word: {
         id: number;
         spelling: string;
         orderIndex?: number;
+        phonetic?: string;
+        grammar?: string;
+        example?: string;
     };
     options: Option[];
+    // For reverse mode override
+    reversePrompt?: string;
+    reverseOptions?: { label: string; isCorrect: boolean }[];
 }
 
 function QuizContent() {
@@ -166,7 +173,7 @@ function QuizContent() {
         }
 
         // 2. Randomize
-        const shuffled = [...remaining].sort(() => Math.random() - 0.5);
+        const shuffled = [...remaining].map(q => ({ ...q, type: 'standard' as const })).sort(() => Math.random() - 0.5);
 
         // 3. Init Progress
         const initProgress: Record<number, { streak: number, required: number }> = {};
@@ -176,7 +183,54 @@ function QuizContent() {
 
         setQueue(shuffled);
         setProgress(initProgress);
-        // setMasteredIds(new Set()); // DON'T RESET, KEEP EXISTING
+        setFinished(false);
+        setView('quiz');
+    };
+
+    const startRecitation = () => {
+        const remaining = previewQuestions.filter(q => !masteredIds.has(q.word.id));
+
+        if (remaining.length === 0) {
+            setFinished(true);
+            return;
+        }
+
+        // Generate Mixed Questions
+        const mixedQueue = remaining.map(q => {
+            if (Math.random() > 0.5) {
+                // Type 1: Standard (Word -> Meaning)
+                return { ...q, type: 'standard' as const };
+            } else {
+                // Type 2: Reverse (Meaning -> Word)
+                const correctMeaning = q.options.find(o => o.isCorrect)?.meaning || 'Definition not found';
+
+                // Pick distractors from OTHER words in the full preview list (to ensure variety)
+                const otherWords = previewQuestions.filter(i => i.word.id !== q.word.id);
+                // Simple shuffle and take 3
+                const distractors = otherWords.sort(() => Math.random() - 0.5).slice(0, 3).map(d => d.word.spelling);
+
+                const options = [
+                    { label: q.word.spelling, isCorrect: true },
+                    ...distractors.map(d => ({ label: d, isCorrect: false }))
+                ].sort(() => Math.random() - 0.5);
+
+                return {
+                    ...q,
+                    type: 'reverse' as const,
+                    reversePrompt: correctMeaning,
+                    reverseOptions: options
+                };
+            }
+        }).sort(() => Math.random() - 0.5);
+
+        // Init Progress (reuse logc)
+        const initProgress: Record<number, { streak: number, required: number }> = {};
+        mixedQueue.forEach(q => {
+            initProgress[q.word.id] = { streak: 0, required: 2 };
+        });
+
+        setQueue(mixedQueue);
+        setProgress(initProgress);
         setFinished(false);
         setView('quiz');
     };
@@ -200,10 +254,21 @@ function QuizContent() {
             // Fast auto-advance for correct
             setTimeout(() => {
                 processNext(wordId, true);
-            }, 700);
+            }, 500);
         } else {
-            const correctMeaning = currentQ.options.find(o => o.isCorrect)?.meaning;
-            setFeedback({ message: `❌ 错误。\n\n正确意思是：\n${correctMeaning}`, type: 'error' });
+            let correctText = '';
+            if (currentQ.type === 'reverse') {
+                // For reverse mode, the "meaning" of the option is actually the spelling (label)
+                // We want to show the correct spelling.
+                // In my render logic, I passed { meaning: label, isCorrect } to handleAnswer
+                const correctOpt = currentQ.reverseOptions?.find(o => o.isCorrect);
+                correctText = correctOpt?.label || currentQ.word.spelling;
+            } else {
+                const correctOption = currentQ.options.find(o => o.isCorrect);
+                correctText = correctOption?.meaning || 'Unknown';
+            }
+
+            setFeedback({ message: `❌ 错误。\n\n正确答案是：\n${correctText}`, type: 'error' });
             // No auto-advance for wrong
         }
     };
@@ -348,12 +413,20 @@ function QuizContent() {
                         </button>
                         <h1 className="text-2xl font-bold text-gray-800">Word Preview ({previewQuestions.length})</h1>
                         {remainingCount > 0 ? (
-                            <button
-                                onClick={startQuiz}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition transform hover:scale-105"
-                            >
-                                Start Quiz ({remainingCount} left) →
-                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={startQuiz}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition transform hover:scale-105"
+                                >
+                                    Start Quiz ({remainingCount} left) →
+                                </button>
+                                <button
+                                    onClick={startRecitation}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition transform hover:scale-105"
+                                >
+                                    Start Recitation 🧠
+                                </button>
+                            </div>
                         ) : (
                             <span className="text-green-600 font-bold">All Mastered!</span>
                         )}
@@ -390,14 +463,30 @@ function QuizContent() {
                                         isLearned ? 'border-blue-300 bg-blue-50 opacity-90' : 'border-gray-200 hover:shadow-md'
                                         }`}
                                 >
-                                    <div className="flex justify-between items-center">
-                                        <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                                    <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                                        <div className="flex flex-col">
                                             <div className="flex items-center">
                                                 <span className="text-gray-400 font-mono mr-6 w-12 text-right text-lg">#{q.word.orderIndex || idx + 1}</span>
                                                 <div className="flex flex-col">
-                                                    <span className={`text-xl font-bold ${hideSpelling && !isMastered && !isLearned ? 'blur-md select-none' : 'text-gray-800'}`}>
-                                                        {q.word.spelling}
-                                                    </span>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className={`text-xl font-bold ${hideSpelling && !isMastered && !isLearned ? 'blur-md select-none' : 'text-gray-800'}`}>
+                                                            {q.word.spelling}
+                                                        </span>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); toggleLearned(q.word.id); }}
+                                                            className={`px-2 py-0.5 rounded text-xs font-bold border transition-colors ${isLearned
+                                                                ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200'
+                                                                : 'bg-white text-gray-400 border-gray-300 hover:border-gray-400 hover:text-gray-600'
+                                                                }`}
+                                                        >
+                                                            {isLearned ? '✓ Licensed' : 'Mark Known'}
+                                                        </button>
+                                                    </div>
+                                                    {q.word.phonetic && (
+                                                        <span className="text-gray-500 text-sm mt-1 font-mono">
+                                                            {q.word.phonetic}
+                                                        </span>
+                                                    )}
                                                     {mistakeStatus === 'unresolved' && (
                                                         <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full w-fit mt-1 font-bold">
                                                             Mistake (Unresolved)
@@ -410,22 +499,29 @@ function QuizContent() {
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className={`text-gray-600 ${hideMeaning && !isMastered && !isLearned ? 'blur-md select-none' : ''}`}>
-                                                {correctOption?.meaning}
-                                            </div>
+
+                                            {/* Expanded Info */}
+                                            {(q.word.grammar || q.word.example) && (!hideMeaning || isMastered || isLearned) && (
+                                                <div className="mt-3 ml-16 text-sm text-gray-600 space-y-2">
+                                                    {q.word.grammar && (
+                                                        <div className="bg-gray-50 p-2 rounded">
+                                                            <span className="font-bold text-gray-700 block text-xs uppercase mb-1">Common Grammar</span>
+                                                            {q.word.grammar}
+                                                        </div>
+                                                    )}
+                                                    {q.word.example && (
+                                                        <div className="bg-gray-50 p-2 rounded italic border-l-2 border-blue-200">
+                                                            {q.word.example}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="ml-4 flex items-center">
-                                            <button
-                                                onClick={() => toggleLearned(q.word.id)}
-                                                className={`px-3 py-1 rounded-full text-sm font-bold border transition-colors ${isLearned
-                                                    ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200'
-                                                    : 'bg-white text-gray-400 border-gray-300 hover:border-gray-400 hover:text-gray-600'
-                                                    }`}
-                                            >
-                                                {isLearned ? '✓ Known' : '○ Mark Known'}
-                                            </button>
+                                        <div className={`text-gray-600 ${hideMeaning && !isMastered && !isLearned ? 'blur-md select-none' : ''}`}>
+                                            {correctOption?.meaning}
                                         </div>
                                     </div>
+
                                 </div>
                             );
                         })}
@@ -457,7 +553,12 @@ function QuizContent() {
                 </div>
 
                 <div className="text-center mb-10">
-                    <h1 className="text-5xl font-bold text-gray-800 mt-4">{currentQ.word.spelling}</h1>
+                    <h1 className="text-5xl font-bold text-gray-800 mt-4">
+                        {currentQ.type === 'reverse' ? currentQ.reversePrompt : currentQ.word.spelling}
+                    </h1>
+                    {currentQ.type !== 'reverse' && currentQ.word.phonetic && (
+                        <div className="text-gray-500 text-xl mt-2 font-mono">{currentQ.word.phonetic}</div>
+                    )}
                 </div>
 
                 {feedback ? (
@@ -477,16 +578,35 @@ function QuizContent() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-4">
-                        {currentQ.options.map((option, idx) => (
-                            <button
-                                key={idx}
-                                onClick={() => handleAnswer(option)}
-                                className="text-left p-4 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition-all text-lg font-medium"
-                            >
-                                <span className="font-bold mr-3">{String.fromCharCode(65 + idx)}.</span>
-                                {option.meaning}
-                            </button>
-                        ))}
+                        {currentQ.type === 'reverse' ? (
+                            // REVERSE MODE OPTIONS (Spellings)
+                            currentQ.reverseOptions?.map((option, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => handleAnswer({ meaning: option.label, isCorrect: option.isCorrect })}
+                                    // Mapping label to meaning to satisfy handleAnswer's expected "Option" type roughly, 
+                                    // or we should update handleAnswer. 
+                                    // Actually handleAnswer expects Option interface. 
+                                    // Let's create a compatible object.
+                                    className="text-left p-4 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition-all text-lg font-medium"
+                                >
+                                    <span className="font-bold mr-3">{String.fromCharCode(65 + idx)}.</span>
+                                    {option.label}
+                                </button>
+                            ))
+                        ) : (
+                            // STANDARD MODE OPTIONS (Meanings)
+                            currentQ.options.map((option, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => handleAnswer(option)}
+                                    className="text-left p-4 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition-all text-lg font-medium"
+                                >
+                                    <span className="font-bold mr-3">{String.fromCharCode(65 + idx)}.</span>
+                                    {option.meaning}
+                                </button>
+                            ))
+                        )}
                     </div>
                 )}
             </div>

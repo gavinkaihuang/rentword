@@ -12,6 +12,8 @@ model Word {
   spelling    String
   meaning     String
   phonetic    String?
+  grammar     String?
+  example     String?
   orderIndex  Int
   
   userProgress UserProgress[]

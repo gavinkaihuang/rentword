@@ -45,7 +45,10 @@ export async function GET(request: Request) {
                 word: {
                     id: word.id,
                     spelling: word.spelling,
-                    orderIndex: (word as any).orderIndex
+                    orderIndex: (word as any).orderIndex,
+                    phonetic: (word as any).phonetic,
+                    grammar: (word as any).grammar,
+                    example: (word as any).example
                 },
                 options: shuffledOptions.map(o => ({ meaning: o.value, isCorrect: o.isCorrect }))
             };

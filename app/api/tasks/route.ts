@@ -256,7 +256,10 @@ async function generateQuestions(words: any[]) {
             word: {
                 id: word.id,
                 spelling: word.spelling,
-                orderIndex: word.orderIndex
+                orderIndex: word.orderIndex,
+                phonetic: word.phonetic,
+                grammar: word.grammar,
+                example: word.example
             },
             options: shuffledOptions.map(o => ({ meaning: o.value, isCorrect: o.isCorrect }))
         };
