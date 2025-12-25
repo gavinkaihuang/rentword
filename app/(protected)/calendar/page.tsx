@@ -27,17 +27,24 @@ export default function CalendarPage() {
     const [monthTime, setMonthTime] = useState<{ learn: number; review: number }>({ learn: 0, review: 0 });
     const [dayTimeStats, setDayTimeStats] = useState<{ learnSeconds: number; reviewSeconds: number } | null>(null);
 
-    const [selectedDate, setSelectedDate] = useState<string | null>(null);
-    const [dayDetails, setDayDetails] = useState<{ word: { spelling: string; meaning: string }; attempts: number; correct: number }[]>([]);
-    const [loadingDetails, setLoadingDetails] = useState(false);
-
     // Simple calendar logic
     const today = new Date();
     const [currentMonth, setCurrentMonth] = useState(today);
+    const [selectedDate, setSelectedDate] = useState<string | null>(today.toISOString().split('T')[0]);
+
+    // Details State
+    const [dayDetails, setDayDetails] = useState<{ word: { id: number; spelling: string; meaning: string }; attempts: number; correct: number; mistakeStatus: 'resolved' | 'unresolved' | null }[]>([]);
+    const [loadingDetails, setLoadingDetails] = useState(false);
 
     useEffect(() => {
         fetchStats();
     }, [currentMonth]);
+
+    useEffect(() => {
+        if (selectedDate) {
+            handleDayClick(selectedDate);
+        }
+    }, []);
 
     const fetchStats = async () => {
         const year = currentMonth.getFullYear();
@@ -107,7 +114,7 @@ export default function CalendarPage() {
         const calendarDays = [];
         // Empty slots for previous month
         for (let i = 0; i < firstDay; i++) {
-            calendarDays.push(<div key={`empty-${i}`} className="h-24 bg-gray-50 border border-gray-100"></div>);
+            calendarDays.push(<div key={`empty-${i}`} className="min-h-[4rem] bg-gray-50 border border-gray-100"></div>);
         }
 
         for (let d = 1; d <= days; d++) {
@@ -120,28 +127,24 @@ export default function CalendarPage() {
                 <div
                     key={dayStr}
                     onClick={() => handleDayClick(dayStr)}
-                    className={`h-24 border border-gray-200 p-2 cursor-pointer transition-colors relative hover:bg-blue-50
+                    className={`min-h-[4rem] border border-gray-200 p-1.5 cursor-pointer transition-colors relative hover:bg-blue-50 flex flex-col justify-between
                         ${isSelected ? 'bg-blue-100 ring-2 ring-blue-400 z-10' : 'bg-white'}
                         ${isToday ? 'font-bold' : ''}
                     `}
                 >
                     <div className="flex justify-between items-start">
-                        <span className={`text-sm ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>{d}</span>
+                        <span className={`text-xs ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>{d}</span>
                         {stat && (
-                            <span className="text-xs font-bold bg-blue-500 text-white rounded-full px-2 py-0.5">
+                            <span className="text-[10px] font-bold bg-blue-500 text-white rounded-full px-1.5 py-0.5">
                                 {stat.total}
                             </span>
                         )}
                     </div>
 
                     {stat && (
-                        <div className="mt-2 text-xs space-y-1">
-                            <div className="flex items-center text-green-600">
-                                <span>✓ {stat.correct}</span>
-                            </div>
-                            <div className="flex items-center text-red-500">
-                                <span>✗ {stat.incorrect}</span>
-                            </div>
+                        <div className="mt-1 flex justify-between text-[10px]">
+                            <span className="text-green-600">✓{stat.correct}</span>
+                            <span className="text-red-500">✗{stat.incorrect}</span>
                         </div>
                     )}
                 </div>
@@ -167,16 +170,16 @@ export default function CalendarPage() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     {/* Calendar Section */}
-                    <div className="lg:col-span-2 bg-white rounded-2xl shadow-lg p-6">
-                        <div className="flex justify-between items-center mb-6">
+                    <div className="lg:col-span-4 bg-white rounded-2xl shadow-lg p-6 h-fit">
+                        <div className="flex justify-between items-center mb-4">
                             <button onClick={handlePrevMonth} className="p-2 hover:bg-gray-100 rounded-lg">←</button>
                             <h2 className="text-xl font-bold">{monthName}</h2>
                             <button onClick={handleNextMonth} className="p-2 hover:bg-gray-100 rounded-lg">→</button>
                         </div>
 
-                        <div className="grid grid-cols-7 gap-px mb-2 text-center text-sm text-gray-500">
+                        <div className="grid grid-cols-7 gap-px mb-2 text-center text-xs font-bold text-gray-400">
                             <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
                         </div>
                         <div className="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-lg overflow-hidden">
@@ -185,9 +188,12 @@ export default function CalendarPage() {
                     </div>
 
                     {/* Details Section */}
-                    <div className="bg-white rounded-2xl shadow-lg p-6 h-fit max-h-[800px] overflow-y-auto">
-                        <h2 className="text-xl font-bold mb-4 border-b pb-2">
-                            {selectedDate ? `Activity for ${selectedDate}` : 'Select a date'}
+                    <div className="lg:col-span-8 bg-white rounded-2xl shadow-lg p-6 min-h-[500px]">
+                        <h2 className="text-xl font-bold mb-4 border-b pb-2 flex justify-between items-center">
+                            <span>{selectedDate ? `Activity for ${selectedDate}` : 'Select a date'}</span>
+                            {selectedDate && dayDetails.length > 0 && (
+                                <span className="text-sm font-normal text-gray-500">{dayDetails.length} words</span>
+                            )}
                         </h2>
 
                         {/* Daily Time Stats */}
@@ -208,10 +214,10 @@ export default function CalendarPage() {
                         )}
 
                         {selectedDate && dayDetails.length > 0 && (
-                            <div className="mb-4">
+                            <div className="mb-6">
                                 <button
                                     onClick={() => router.push(`/learn?mode=4&date=${selectedDate}`)}
-                                    className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition flex items-center justify-center gap-2"
+                                    className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 shadow-sm"
                                 >
                                     <span>🔄</span> Study These Values Again
                                 </button>
@@ -222,19 +228,32 @@ export default function CalendarPage() {
                             <div className="text-gray-500 text-center py-10">Loading details...</div>
                         ) : selectedDate ? (
                             dayDetails.length > 0 ? (
-                                <div className="space-y-4">
-                                    <div className="text-sm text-gray-500 mb-2">
-                                        Recited {dayDetails.length} unique words.
-                                    </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                                     {dayDetails.map((item, idx) => (
-                                        <div key={idx} className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                        <div key={idx} className="p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-blue-200 hover:shadow-sm transition-all">
                                             <div className="flex justify-between items-start mb-1">
-                                                <h3 className="font-bold text-lg text-gray-800">{item.word.spelling}</h3>
-                                                <div className="px-2 py-0.5 rounded text-xs font-bold bg-gray-200 text-gray-700">
-                                                    {item.correct}/{item.attempts} Correct
+                                                <div className="flex flex-col">
+                                                    <div className="flex items-center gap-2">
+                                                        <h3 className="font-bold text-base text-gray-800">{item.word.spelling}</h3>
+                                                    </div>
+                                                    <div className="flex gap-1 mt-1">
+                                                        {item.mistakeStatus === 'unresolved' && (
+                                                            <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">
+                                                                Mistake
+                                                            </span>
+                                                        )}
+                                                        {item.mistakeStatus === 'resolved' && (
+                                                            <span className="text-[10px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full font-bold">
+                                                                Resolved
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-200 text-gray-700 whitespace-nowrap">
+                                                    {item.correct}/{item.attempts}
                                                 </div>
                                             </div>
-                                            <p className="text-sm text-gray-600 line-clamp-2">{item.word.meaning}</p>
+                                            <p className="text-xs text-gray-600 line-clamp-2 mt-1">{item.word.meaning}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -244,8 +263,9 @@ export default function CalendarPage() {
                                 </div>
                             )
                         ) : (
-                            <div className="text-gray-500 text-center py-10">
-                                Click on a date in the calendar to view recitation details.
+                            <div className="text-gray-500 text-center py-10 flex flex-col items-center">
+                                <div className="text-4xl mb-2">👈</div>
+                                <p>Click on a date in the calendar to view recitation details.</p>
                             </div>
                         )}
                     </div>

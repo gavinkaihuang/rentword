@@ -1,12 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function Home() {
   const router = useRouter();
   const [mode1From, setMode1From] = useState('');
   const [mode1To, setMode1To] = useState('');
+  const [recentTask, setRecentTask] = useState<any>(null);
+
+  useEffect(() => {
+    // Fetch recent tasks (today)
+    const today = new Date().toISOString().split('T')[0];
+    fetch(`/api/tasks?date=${today}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.tasks && data.tasks.length > 0) {
+          // Find first incomplete task
+          const incomplete = data.tasks.find((t: any) => t.status !== 'COMPLETED');
+          if (incomplete) setRecentTask(incomplete);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   const startMode1 = async () => {
     if (!mode1From) {
@@ -51,6 +67,28 @@ export default function Home() {
           Sign Out
         </button>
       </div>
+
+      {/* Resume Task Section */}
+      {recentTask && (
+        <div className="w-full max-w-4xl mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 shadow-md flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-bold text-blue-800">🚀 Continue Learning</h2>
+            <p className="text-blue-600">{recentTask.description} ({recentTask.completedCount}/{recentTask.totalCount})</p>
+            <div className="w-48 bg-gray-200 rounded-full h-2 mt-2">
+              <div
+                className="bg-blue-600 h-2 rounded-full"
+                style={{ width: `${(recentTask.completedCount / recentTask.totalCount) * 100}%` }}
+              />
+            </div>
+          </div>
+          <button
+            onClick={() => router.push(`/learn?taskId=${recentTask.id}`)}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-lg"
+          >
+            Resume
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
         {/* Mode 1 */}

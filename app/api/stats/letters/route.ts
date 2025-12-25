@@ -3,75 +3,110 @@ import prisma from '@/lib/prisma';
 
 export async function GET(request: Request) {
     try {
-        // 1. Get total count per starting letter
-        // Since sqlite doesn't support sophisticated string functions in groupBy easily in prisma raw, 
-        // we might fetch all valid spelling prefixes or use raw query.
-        // Prisma doesn't support grouping by substring.
-        // Let's use raw query for efficiency.
-
-        const totalCounts = await prisma.$queryRaw<Array<{ letter: string, count: number }>>`
-            SELECT 
-                LOWER(SUBSTR(spelling, 1, 1)) as letter, 
-                COUNT(*) as count 
-            FROM "Word" 
-            WHERE spelling REGEXP '^[a-zA-Z]' 
-            GROUP BY LOWER(SUBSTR(spelling, 1, 1))
-        `;
-        // Note: REGEXP might not be available in default sqlite build, usually GLOB or LIKE is safer.
-        // But for single char prefix, `SUBSTR(spelling, 1, 1)` is fine.
-        // Let's try standard SQLite compatible way.
-
-        // Actually, prisma usually handles raw queries well. But local sqlite might vary.
-        // Let's stick to a simpler approach if uncertain about regex: 
-        // Iterate A-Z and count? No, that's 26 queries.
-        // Fetch all spellings? 3800 words is small enough to fetch 'id' and 'spelling' into memory and aggregate.
-        // This is safe and robust across DBs for this dataset size.
-
+        // 1. Fetch all basic data
         const allWords = await prisma.word.findMany({
             select: { id: true, spelling: true }
         });
 
-        const letterStats: Record<string, { total: number, learned: number }> = {};
+        const userProgress = await prisma.userProgress.findMany({
+            where: { proficiency: { gt: 0 } },
+            select: {
+                wordId: true,
+                lastReviewed: true,
+                proficiency: true // Optional: could track mastery
+            }
+        });
+
+        // 2. Fetch Review Log Stats (Aggregated)
+        // SQLite stores boolean as 0/1. 
+        // We want total reviews and simple incorrect count (isCorrect = 0).
+        const logStats = await prisma.$queryRaw<Array<{ wordId: number, total: number, incorrect: number }>>`
+            SELECT 
+                wordId, 
+                COUNT(*) as total, 
+                SUM(CASE WHEN isCorrect = 0 THEN 1 ELSE 0 END) as incorrect
+            FROM ReviewLog 
+            GROUP BY wordId
+        `;
+
+        // 3. Initialize Stats Map
+        const letterStats: Record<string, {
+            total: number,
+            learned: number,
+            lastReviewed: number | null, // timestamp
+            reviewTotal: number,
+            reviewIncorrect: number
+        }> = {};
+
         const aCode = 'a'.charCodeAt(0);
         for (let i = 0; i < 26; i++) {
-            letterStats[String.fromCharCode(aCode + i)] = { total: 0, learned: 0 };
+            letterStats[String.fromCharCode(aCode + i)] = {
+                total: 0,
+                learned: 0,
+                lastReviewed: null,
+                reviewTotal: 0,
+                reviewIncorrect: 0
+            };
         }
 
-        const wordIdToLetter = new Map<number, string>();
+        // 4. Create Maps for lookup
+        const wordIdToLetter = new Map<number, string>(); // WordID -> Letter
+        const wordIdToProgress = new Map<number, any>(); // WordID -> Progress
+        const wordIdToLog = new Map<number, { total: number, incorrect: number }>();
 
+        logStats.forEach((l: any) => {
+            // raw query usually returns BigInt for count in some prisma adapters, handle number conversion just in case
+            const t = Number(l.total);
+            const i = Number(l.incorrect); // "incorrect" is the name
+            wordIdToLog.set(l.wordId, { total: t, incorrect: i });
+        });
+
+        userProgress.forEach(p => wordIdToProgress.set(p.wordId, p));
+
+        // 5. Aggregate
         allWords.forEach(w => {
             const firstChar = w.spelling.charAt(0).toLowerCase();
             if (firstChar >= 'a' && firstChar <= 'z') {
-                letterStats[firstChar].total++;
+                const stat = letterStats[firstChar];
+                stat.total++;
                 wordIdToLetter.set(w.id, firstChar);
+
+                // Progress
+                const prog = wordIdToProgress.get(w.id);
+                if (prog) {
+                    stat.learned++;
+                    if (prog.lastReviewed) {
+                        const t = new Date(prog.lastReviewed).getTime();
+                        if (!stat.lastReviewed || t > stat.lastReviewed) {
+                            stat.lastReviewed = t;
+                        }
+                    }
+                }
+
+                // Logs
+                const logs = wordIdToLog.get(w.id);
+                if (logs) {
+                    stat.reviewTotal += logs.total;
+                    stat.reviewIncorrect += logs.incorrect;
+                }
             }
         });
 
-        // 2. Get learned status
-        // A word is "learned" if proficiency > 0 or has userProgress?
-        // Let's assume UserProgress existing implies some interaction. 
-        // Or strictly `proficiency > 0`.
+        // 6. Format Result
+        const result = Object.entries(letterStats).map(([letter, stats]) => {
+            const errorRate = stats.reviewTotal > 0
+                ? Math.round((stats.reviewIncorrect / stats.reviewTotal) * 1000) / 10 // 1 decimal place
+                : 0;
 
-        const userProgress = await prisma.userProgress.findMany({
-            where: {
-                proficiency: { gt: 0 }
-            },
-            select: { wordId: true }
-        });
-
-        userProgress.forEach(p => {
-            const letter = wordIdToLetter.get(p.wordId);
-            if (letter) {
-                letterStats[letter].learned++;
-            }
-        });
-
-        const result = Object.entries(letterStats).map(([letter, stats]) => ({
-            letter: letter.toUpperCase(),
-            total: stats.total,
-            learned: stats.learned,
-            percentage: stats.total > 0 ? Math.round((stats.learned / stats.total) * 100) : 0
-        })).sort((a, b) => a.letter.localeCompare(b.letter));
+            return {
+                letter: letter.toUpperCase(),
+                total: stats.total,
+                learned: stats.learned,
+                percentage: stats.total > 0 ? Math.round((stats.learned / stats.total) * 100) : 0,
+                lastStudied: stats.lastReviewed ? new Date(stats.lastReviewed).toISOString() : null,
+                errorRate
+            };
+        }).sort((a, b) => a.letter.localeCompare(b.letter));
 
         return NextResponse.json({ stats: result });
 

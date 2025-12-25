@@ -71,7 +71,42 @@ export async function GET(request: Request) {
             else if (s.type === 'EXERCISE') timeStats.reviewSeconds += s.duration;
         });
 
-        const result = Array.from(uniqueWords.values());
+        // Check for mistakes (Mistake Book Status)
+        // Check for mistakes (Mistake Book Status)
+        const wordIds = Array.from(uniqueWords.keys());
+        const mistakeLogs = await prisma.reviewLog.findMany({
+            where: {
+                wordId: { in: wordIds },
+                isCorrect: false
+            },
+            select: { wordId: true },
+            distinct: ['wordId']
+        });
+
+        const mistakeIds = mistakeLogs.map(l => l.wordId);
+
+        // Fetch their progress
+        const progressList = await prisma.userProgress.findMany({
+            where: { wordId: { in: mistakeIds } }
+        });
+        const progressMap = new Map();
+        progressList.forEach(p => progressMap.set(p.wordId, p));
+
+        const result = Array.from(uniqueWords.values()).map((entry: any) => {
+            const id = entry.word.id;
+            let mistakeStatus: 'resolved' | 'unresolved' | null = null;
+
+            if (mistakeIds.includes(id)) {
+                const p = progressMap.get(id);
+                const consecutive = p?.consecutiveCorrect || 0;
+                mistakeStatus = consecutive > 0 ? 'resolved' : 'unresolved';
+            }
+
+            return {
+                ...entry,
+                mistakeStatus
+            };
+        });
 
         return NextResponse.json({ date: dateStr, words: result, timeStats });
     } catch (error) {

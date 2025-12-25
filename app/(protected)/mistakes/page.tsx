@@ -19,14 +19,17 @@ export default function MistakeNotebook() {
     const [totalPages, setTotalPages] = useState(1);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
+    const [status, setStatus] = useState<'unmastered' | 'mastered'>('unmastered');
+
     useEffect(() => {
         fetchMistakes();
-    }, [page]);
+        setSelectedIds(new Set()); // Reset selection on change
+    }, [page, status]);
 
     const fetchMistakes = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/mistakes?page=${page}&limit=20`);
+            const res = await fetch(`/api/mistakes?page=${page}&limit=20&status=${status}`);
             const data = await res.json();
             setMistakes(data.mistakes);
             setTotalPages(data.pagination.totalPages);
@@ -74,10 +77,42 @@ export default function MistakeNotebook() {
         <div className="min-h-screen bg-gray-50 flex flex-col p-4 md:p-8">
             <div className="max-w-5xl w-full mx-auto">
                 <div className="flex justify-between items-center mb-8">
-                    <button onClick={() => router.push('/')} className="text-gray-500 hover:text-gray-700 flex items-center gap-2">
-                        ← Back Home
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => router.push('/')} className="text-gray-500 hover:text-gray-700 flex items-center gap-2">
+                            ← Back Home
+                        </button>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => router.push('/learn?mode=7')}
+                            className="mr-3 px-6 py-2 rounded-lg font-bold bg-purple-500 hover:bg-purple-600 text-white transition flex items-center gap-2 shadow-lg"
+                        >
+                            <span>🧠</span> Smart Review (All)
+                        </button>
+                    </div>
+                </div>
+                <h1 className="text-3xl font-bold text-gray-800 mb-6">📕 Mistake Notebook</h1>
+
+                {/* Tabs */}
+                <div className="flex gap-4 mb-6 border-b border-gray-200">
+                    <button
+                        onClick={() => { setStatus('unmastered'); setPage(1); }}
+                        className={`pb-2 px-4 font-bold transition-all border-b-2 ${status === 'unmastered'
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                            }`}
+                    >
+                        😟 Unresolved (Need Practice)
                     </button>
-                    <h1 className="text-3xl font-bold text-gray-800">📕 Mistake Notebook</h1>
+                    <button
+                        onClick={() => { setStatus('mastered'); setPage(1); }}
+                        className={`pb-2 px-4 font-bold transition-all border-b-2 ${status === 'mastered'
+                            ? 'border-green-500 text-green-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                            }`}
+                    >
+                        😎 Resolved (Mastered)
+                    </button>
                 </div>
 
                 <div className="bg-white rounded-2xl shadow-lg p-6">
@@ -85,6 +120,7 @@ export default function MistakeNotebook() {
                         <div className="text-gray-600">
                             Selected: <span className="font-bold text-blue-600">{selectedIds.size}</span> words
                         </div>
+
                         <button
                             onClick={handleReview}
                             disabled={selectedIds.size === 0}

@@ -12,6 +12,7 @@ interface Question {
     word: {
         id: number;
         spelling: string;
+        orderIndex?: number;
     };
     options: Option[];
 }
@@ -19,9 +20,12 @@ interface Question {
 function QuizContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
+
+    // New Task Params
+    const taskIdParam = searchParams.get('taskId');
+
+    // Old Mode Params (for initialization)
     const mode = searchParams.get('mode');
-    const from = searchParams.get('from');
-    const to = searchParams.get('to');
 
     // Data for Preview
     const [previewQuestions, setPreviewQuestions] = useState<Question[]>([]);
@@ -36,13 +40,21 @@ function QuizContent() {
     const [finished, setFinished] = useState(false);
 
     const [view, setView] = useState<'preview' | 'quiz'>('preview');
+    const [learnedWords, setLearnedWords] = useState<Set<number>>(new Set());
+    const [mistakeStatusMap, setMistakeStatusMap] = useState<Record<number, 'resolved' | 'unresolved'>>({});
+
+    const [currentTaskId, setCurrentTaskId] = useState<number | null>(null);
     const [hideSpelling, setHideSpelling] = useState(false);
     const [hideMeaning, setHideMeaning] = useState(false);
-    const [learnedWords, setLearnedWords] = useState<Set<number>>(new Set());
 
+    // Initial Load
     useEffect(() => {
-        fetchQuestions();
-    }, [mode, from, to]);
+        if (taskIdParam) {
+            loadTask(parseInt(taskIdParam));
+        } else if (mode) {
+            initTaskFromParams();
+        }
+    }, [taskIdParam, mode]);
 
     // Time Tracking
     useEffect(() => {
@@ -62,53 +74,101 @@ function QuizContent() {
         };
     }, [view]);
 
-    const fetchQuestions = async () => {
-        setLoading(true);
-        let url = '';
-        if (mode === '1') {
-            const limit = searchParams.get('limit') || '20';
-            url = `/api/learn/mode1?from=${from}&to=${to}&limit=${limit}`;
-        }
-        else if (mode === '2') url = `/api/learn/mode2`;
-        else if (mode === '3') url = `/api/learn/mode3?limit=20`;
-        else if (mode === '4') {
-            const date = searchParams.get('date');
-            if (date) url = `/api/learn/mode4?date=${date}`;
-        }
-        else if (mode === '5') {
-            const ids = searchParams.get('ids');
-            if (ids) url = `/api/learn/mode5?ids=${ids}`;
-        }
-        else if (mode === '6') {
-            const ids = searchParams.get('ids');
-            if (ids) url = `/api/learn/mode6?ids=${ids}`;
-        }
-
+    const checkMistakes = async (questions: Question[]) => {
+        if (questions.length === 0) return;
+        const wordIds = questions.map(q => q.word.id);
         try {
-            const res = await fetch(url);
+            const res = await fetch('/api/mistakes/check', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ wordIds })
+            });
             const data = await res.json();
-            if (data.questions && data.questions.length > 0) {
-                setPreviewQuestions(data.questions);
-                // Initialize queue immediately or wait for Start?
-                // Preview uses previewQuestions.
-                setView('preview');
-            } else {
-                setPreviewQuestions([]);
-                setFinished(true); // No questions found
+            if (data.mistakeStatus) {
+                setMistakeStatusMap(data.mistakeStatus);
             }
         } catch (e) {
-            console.error(e);
-            alert('Failed to load questions');
-        } finally {
-            setLoading(false);
+            console.error('Failed to check mistakes', e);
         }
     };
 
-    const startQuiz = () => {
-        // 1. Randomize
-        const shuffled = [...previewQuestions].sort(() => Math.random() - 0.5);
+    const initTaskFromParams = async () => {
+        setLoading(true);
+        try {
+            // Construct body from searchParams
+            const params: any = {};
+            searchParams.forEach((value, key) => { params[key] = value; });
 
-        // 2. Init Progress
+            const res = await fetch('/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(params)
+            });
+            const data = await res.json();
+
+            if (data.task) {
+                // Redirect to the same page but with taskId
+                // using replace to avoid history stack buildup
+                router.replace(`/learn?taskId=${data.task.id}`);
+            } else {
+                alert('Failed to initialize task: ' + (data.error || 'Unknown error'));
+                setLoading(false);
+            }
+        } catch (e) {
+            console.error(e);
+            setLoading(false);
+        }
+    }
+
+    const loadTask = async (id: number) => {
+        setLoading(true);
+        setCurrentTaskId(id);
+        try {
+            const res = await fetch(`/api/tasks/${id}`);
+            const data = await res.json();
+
+            if (data.task) {
+                const questions = JSON.parse(data.task.content);
+                const taskProgress = JSON.parse(data.task.progress || '{}');
+                const previousMasteredIds = new Set<number>(taskProgress.masteredIds || []);
+
+                setPreviewQuestions(questions);
+                setMasteredIds(previousMasteredIds);
+                checkMistakes(questions); // Check mistakes
+
+                // Filter out mastered words from the initial queue?
+                // Actually, let's just set the preview questions, but startQuiz will handle filtering.
+                // Or if we are 'Resuming', maybe we skip preview?
+                // Users might want to review the full list even if partially done.
+                // Let's stay in preview mode initially.
+
+                // If the task is already marked completed in DB
+                if (data.task.status === 'COMPLETED') {
+                    setFinished(true);
+                }
+
+                setView('preview');
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    const startQuiz = () => {
+        // 1. Filter out mastered words from previewQuestions
+        const remaining = previewQuestions.filter(q => !masteredIds.has(q.word.id));
+
+        if (remaining.length === 0) {
+            setFinished(true); // Nothing left to do
+            return;
+        }
+
+        // 2. Randomize
+        const shuffled = [...remaining].sort(() => Math.random() - 0.5);
+
+        // 3. Init Progress
         const initProgress: Record<number, { streak: number, required: number }> = {};
         shuffled.forEach(q => {
             initProgress[q.word.id] = { streak: 0, required: 2 }; // Target 2 consecutive correct
@@ -116,127 +176,118 @@ function QuizContent() {
 
         setQueue(shuffled);
         setProgress(initProgress);
-        setMasteredIds(new Set());
+        // setMasteredIds(new Set()); // DON'T RESET, KEEP EXISTING
         setFinished(false);
         setView('quiz');
     };
 
     const handleAnswer = async (option: Option) => {
+        if (feedback) return; // Prevent double clicks
+
         const currentQ = queue[0];
         const isCorrect = option.isCorrect;
         const wordId = currentQ.word.id;
 
-        // Feedback
+        // Submit to Backend (Fire and forget)
+        fetch('/api/learn/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wordId, isCorrect })
+        }).catch(e => console.error(e));
+
         if (isCorrect) {
             setFeedback({ message: '✅ 正确！', type: 'success' });
+            // Fast auto-advance for correct
+            setTimeout(() => {
+                processNext(wordId, true);
+            }, 700);
         } else {
             const correctMeaning = currentQ.options.find(o => o.isCorrect)?.meaning;
-            setFeedback({ message: `❌ 错误。正确意是：${correctMeaning}`, type: 'error' });
+            setFeedback({ message: `❌ 错误。\n\n正确意思是：\n${correctMeaning}`, type: 'error' });
+            // No auto-advance for wrong
         }
+    };
 
-        // Submit to Backend (SRS stats)
-        try {
-            await fetch('/api/learn/submit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ wordId, isCorrect })
-            });
-        } catch (e) { console.error(e); }
+    const processNext = (wordId: number, isCorrect: boolean) => {
+        setFeedback(null);
+        const currentQ = queue[0];
 
-        // Algorithm Logic
-        setTimeout(() => {
-            setFeedback(null);
+        const newQueue = [...queue];
+        newQueue.shift(); // Remove current
 
-            const newQueue = [...queue];
-            newQueue.shift(); // Remove current
+        const currentProgress = progress[wordId] || { streak: 0, required: 3 };
+        const isAlreadyMastered = masteredIds.has(wordId);
 
-            const currentProgress = progress[wordId] || { streak: 0, required: 3 };
-            const isAlreadyMastered = masteredIds.has(wordId);
+        if (isCorrect) {
+            const newStreak = currentProgress.streak + 1;
 
-            if (isCorrect) {
-                const newStreak = currentProgress.streak + 1;
+            if (isAlreadyMastered) {
+                // Done
+            } else if (newStreak >= currentProgress.required) {
+                const newMastered = new Set(masteredIds).add(wordId);
+                setMasteredIds(newMastered);
+                saveTaskProgress(newMastered, false);
 
-                // Check Mastery
-                if (isAlreadyMastered) {
-                    // Filler maintenance: Keep mastered (do nothing), or reduce probability?
-                    // Just let it disappear from queue (already shifted).
-                } else if (newStreak >= currentProgress.required) {
-                    // Just Mastered!
-                    setMasteredIds(prev => new Set(prev).add(wordId));
-
-                    // Check if all words are mastered
-                    // If this was the last unmastered word, finish immediately
-                    const isNewMastery = !masteredIds.has(wordId);
-                    if (isNewMastery && (masteredIds.size + 1 >= previewQuestions.length)) {
-                        setFinished(true);
-                        // Clear queue to ensure consistency if we return early
-                        setQueue([]);
-                        return;
-                    }
-                } else {
-                    // Not mastered yet, Schedule recurrence
-                    // Random insert 3-10 positions ahead
-                    const insertAt = Math.min(newQueue.length, Math.floor(Math.random() * 8) + 3);
-                    // Shuffle options before re-inserting
-                    const nextQ = { ...currentQ, options: [...currentQ.options].sort(() => Math.random() - 0.5) };
-
-                    newQueue.splice(insertAt, 0, nextQ);
-
-                    // Update Streak
-                    setProgress(prev => ({
-                        ...prev,
-                        [wordId]: { ...currentProgress, streak: newStreak }
-                    }));
+                if (newMastered.size >= previewQuestions.length) {
+                    setFinished(true);
+                    saveTaskProgress(newMastered, true);
+                    setQueue([]);
+                    return;
                 }
             } else {
-                // Wrong
-                // If it was mastered (filler failure), un-master it!
-                if (isAlreadyMastered) {
-                    setMasteredIds(prev => {
-                        const s = new Set(prev);
-                        s.delete(wordId);
-                        return s;
-                    });
-                }
+                const insertAt = Math.min(newQueue.length, Math.floor(Math.random() * 8) + 3);
+                const nextQ = { ...currentQ, options: [...currentQ.options].sort(() => Math.random() - 0.5) };
+                newQueue.splice(insertAt, 0, nextQ);
 
-                // Reset streak, Set required to 3 (harder)
                 setProgress(prev => ({
                     ...prev,
-                    [wordId]: { streak: 0, required: 3 }
+                    [wordId]: { ...currentProgress, streak: newStreak }
                 }));
-
-                // Re-insert soon (2-5 positions) WITH Shuffled Options
-                const insertAt = Math.min(newQueue.length, Math.floor(Math.random() * 4) + 2);
-                const nextQ = { ...currentQ, options: [...currentQ.options].sort(() => Math.random() - 0.5) };
-
-                newQueue.splice(insertAt, 0, nextQ);
+            }
+        } else {
+            // Wrong Logic
+            if (isAlreadyMastered) {
+                const newMastered = new Set(masteredIds);
+                newMastered.delete(wordId);
+                setMasteredIds(newMastered);
+                saveTaskProgress(newMastered, false);
             }
 
-            // Filler Logic
-            const masteredList = previewQuestions.filter(q => masteredIds.has(q.word.id));
+            setProgress(prev => ({
+                ...prev,
+                [wordId]: { streak: 0, required: 3 }
+            }));
 
-            // If queue is short (last few words) AND we have mastered words involved
-            // AND we have pending difficult words (implied by queue length > 0)
-            if (newQueue.length > 0 && newQueue.length <= 2 && masteredList.length >= 5) {
-                // Determine if we should inject a filler to reduce frustration
-                const randomMastered = masteredList[Math.floor(Math.random() * masteredList.length)];
-                if (randomMastered) {
-                    // Randomize options for filler
-                    const fillerQ = { ...randomMastered, options: [...randomMastered.options].sort(() => Math.random() - 0.5) };
+            const insertAt = Math.min(newQueue.length, Math.floor(Math.random() * 4) + 2);
+            const nextQ = { ...currentQ, options: [...currentQ.options].sort(() => Math.random() - 0.5) };
+            newQueue.splice(insertAt, 0, nextQ);
+        }
 
-                    // Insert at position 1
-                    const fillerPos = Math.min(newQueue.length, 1);
-                    newQueue.splice(fillerPos, 0, fillerQ);
-                }
-            }
+        setQueue(newQueue);
 
-            setQueue(newQueue);
-
-            if (newQueue.length === 0) {
+        // Final check
+        if (newQueue.length === 0) {
+            if (masteredIds.size >= previewQuestions.length) {
+                setFinished(true);
+                saveTaskProgress(masteredIds, true);
+            } else {
                 setFinished(true);
             }
+        }
+    };
 
-        }, 1500);
+    const saveTaskProgress = async (mastered: Set<number>, isCompleted: boolean) => {
+        if (!currentTaskId) return;
+        try {
+            await fetch(`/api/tasks/${currentTaskId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    masteredIds: Array.from(mastered),
+                    isCompleted
+                })
+            });
+        } catch (e) { console.error('Failed to save progress', e); }
     };
 
     const toggleLearned = (id: number) => {
@@ -246,7 +297,7 @@ function QuizContent() {
         setLearnedWords(newLearned);
     };
 
-    if (loading) return <div className="p-10 text-center">Loading questions...</div>;
+    if (loading) return <div className="p-10 text-center">Loading task...</div>;
 
     if (finished) {
         return (
@@ -287,20 +338,25 @@ function QuizContent() {
 
     // PREVIEW MODE
     if (view === 'preview') {
+        const remainingCount = previewQuestions.length - masteredIds.size;
         return (
             <div className="min-h-screen bg-gray-50 p-4 md:p-8 flex flex-col items-center">
-                <div className="max-w-3xl w-full">
+                <div className="max-w-6xl w-full">
                     <div className="flex justify-between items-center mb-6">
                         <button onClick={() => router.push('/')} className="text-gray-500 hover:text-gray-700">
                             ← Back
                         </button>
                         <h1 className="text-2xl font-bold text-gray-800">Word Preview ({previewQuestions.length})</h1>
-                        <button
-                            onClick={startQuiz}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition transform hover:scale-105"
-                        >
-                            Start Quiz →
-                        </button>
+                        {remainingCount > 0 ? (
+                            <button
+                                onClick={startQuiz}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition transform hover:scale-105"
+                            >
+                                Start Quiz ({remainingCount} left) →
+                            </button>
+                        ) : (
+                            <span className="text-green-600 font-bold">All Mastered!</span>
+                        )}
                     </div>
 
                     <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 sticky top-4 z-10 border border-blue-100">
@@ -322,34 +378,53 @@ function QuizContent() {
 
                     <div className="space-y-4 pb-20">
                         {previewQuestions.map((q, idx) => {
+                            const isLearned = learnedWords.has(q.word.id); // For aesthetic toggle only
+                            const isMastered = masteredIds.has(q.word.id);
+                            const mistakeStatus = mistakeStatusMap[q.word.id]; // 'resolved' | 'unresolved' | undefined
                             const correctOption = q.options.find(o => o.isCorrect);
-                            const isLearned = learnedWords.has(q.word.id);
+
                             return (
                                 <div
                                     key={q.word.id}
-                                    className={`bg-white rounded-xl p-4 shadow-sm border transition-all ${isLearned ? 'border-green-200 bg-green-50 opacity-70' : 'border-gray-200 hover:shadow-md'
+                                    className={`bg-white rounded-xl p-4 shadow-sm border transition-all ${isMastered ? 'border-green-300 bg-green-50 opacity-80' :
+                                        isLearned ? 'border-blue-300 bg-blue-50 opacity-90' : 'border-gray-200 hover:shadow-md'
                                         }`}
                                 >
                                     <div className="flex justify-between items-center">
                                         <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
                                             <div className="flex items-center">
-                                                <span className="text-gray-400 font-mono mr-3 w-6 text-right">#{idx + 1}</span>
-                                                <span className={`text-xl font-bold ${hideSpelling && !isLearned ? 'blur-md select-none' : 'text-gray-800'}`}>
-                                                    {q.word.spelling}
-                                                </span>
+                                                <span className="text-gray-400 font-mono mr-6 w-12 text-right text-lg">#{q.word.orderIndex || idx + 1}</span>
+                                                <div className="flex flex-col">
+                                                    <span className={`text-xl font-bold ${hideSpelling && !isMastered && !isLearned ? 'blur-md select-none' : 'text-gray-800'}`}>
+                                                        {q.word.spelling}
+                                                    </span>
+                                                    {mistakeStatus === 'unresolved' && (
+                                                        <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full w-fit mt-1 font-bold">
+                                                            Mistake (Unresolved)
+                                                        </span>
+                                                    )}
+                                                    {mistakeStatus === 'resolved' && (
+                                                        <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full w-fit mt-1 font-bold">
+                                                            Mistake (Mastered)
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className={`text-gray-600 ${hideMeaning && !isLearned ? 'blur-md select-none' : ''}`}>
+                                            <div className={`text-gray-600 ${hideMeaning && !isMastered && !isLearned ? 'blur-md select-none' : ''}`}>
                                                 {correctOption?.meaning}
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={() => toggleLearned(q.word.id)}
-                                            className={`ml-4 p-2 rounded-full transition ${isLearned ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                                                }`}
-                                            title="Mark as learned"
-                                        >
-                                            {isLearned ? '✓' : '○'}
-                                        </button>
+                                        <div className="ml-4 flex items-center">
+                                            <button
+                                                onClick={() => toggleLearned(q.word.id)}
+                                                className={`px-3 py-1 rounded-full text-sm font-bold border transition-colors ${isLearned
+                                                    ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200'
+                                                    : 'bg-white text-gray-400 border-gray-300 hover:border-gray-400 hover:text-gray-600'
+                                                    }`}
+                                            >
+                                                {isLearned ? '✓ Known' : '○ Mark Known'}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             );
@@ -386,9 +461,19 @@ function QuizContent() {
                 </div>
 
                 {feedback ? (
-                    <div className={`p-6 rounded-xl text-center text-xl font-bold mb-6 ${feedback.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    <div className={`p-6 rounded-xl text-center mb-6 flex flex-col items-center gap-4 ${feedback.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-50 text-red-800'
                         }`}>
-                        {feedback.message}
+                        <div className="text-xl font-bold whitespace-pre-wrap">{feedback.message}</div>
+
+                        {feedback.type === 'error' && (
+                            <button
+                                onClick={() => processNext(currentQ.word.id, false)}
+                                className="mt-4 bg-red-600 text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-red-700 transition-colors w-full md:w-auto"
+                                autoFocus
+                            >
+                                Continue →
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-4">

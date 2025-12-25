@@ -44,3 +44,27 @@ model StudySession {
   duration  Int      // Seconds
   type      String   // 'LEARN' or 'EXERCISE'
 }
+
+model Task {
+  id            Int      @id @default(autoincrement())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Configuration
+  mode          String   // 'RANGE', 'RANDOM', 'REVIEW', etc.
+  description   String   // Display title
+  
+  // Snapshot State (JSON)
+  // Stores: { wordIds: number[], options: any }
+  content       String   
+  
+  // Progress
+  totalCount    Int
+  completedCount Int     @default(0)
+  
+  // Detailed Progress (JSON)
+  // Stores: { masteredIds: number[] }
+  progress      String   @default("{}")
+  
+  status        String   @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED
+}
