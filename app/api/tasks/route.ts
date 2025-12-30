@@ -1,10 +1,20 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
     try {
+        const userIdHeader = request.headers.get('x-user-id');
+        if (!userIdHeader) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        const userId = parseInt(userIdHeader);
+
         const body = await request.json();
         const { mode, ...params } = body;
+
+        const cookieStore = await cookies();
+        const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
 
         if (!mode) {
             return NextResponse.json({ error: 'Missing mode' }, { status: 400 });
@@ -24,11 +34,11 @@ export async function POST(request: Request) {
 
             // If not numbers, try to find words by spelling
             if (isNaN(fromNum)) {
-                const startWord = await prisma.word.findFirst({ where: { spelling: from } });
+                const startWord = await prisma.word.findFirst({ where: { spelling: from, wordBookId: activeWordBookId } });
                 if (startWord) fromNum = startWord.orderIndex;
             }
             if (isNaN(toNum)) {
-                const endWord = await prisma.word.findFirst({ where: { spelling: to } });
+                const endWord = await prisma.word.findFirst({ where: { spelling: to, wordBookId: activeWordBookId } });
                 if (endWord) toNum = endWord.orderIndex;
             }
 
@@ -40,6 +50,7 @@ export async function POST(request: Request) {
 
             const words = await prisma.word.findMany({
                 where: {
+                    wordBookId: activeWordBookId,
                     orderIndex: {
                         gte: fromNum,
                         lte: toNum
@@ -48,10 +59,9 @@ export async function POST(request: Request) {
                 take: limitNum
             });
 
-            questions = await generateQuestions(words);
+            questions = await generateQuestions(words, activeWordBookId);
 
         } else if (mode === '4') { // Daily Review
-            // ... Logic for daily review (Mode 4) ...
             const { date } = params;
             description = `Daily Review: ${date}`;
 
@@ -61,33 +71,37 @@ export async function POST(request: Request) {
             const endOfDay = new Date(date); endOfDay.setHours(23, 59, 59, 999);
 
             const logs = await prisma.reviewLog.findMany({
-                where: { createdAt: { gte: startOfDay, lte: endOfDay } },
+                where: {
+                    createdAt: { gte: startOfDay, lte: endOfDay },
+                    userId: userId
+                },
                 select: { wordId: true },
                 distinct: ['wordId']
             });
 
             if (logs.length > 0) {
                 const wordIds = logs.map(l => l.wordId);
-                const words = await prisma.word.findMany({ where: { id: { in: wordIds } } });
-                questions = await generateQuestions(words);
+                const words = await prisma.word.findMany({ where: { id: { in: wordIds }, wordBookId: activeWordBookId } });
+                questions = await generateQuestions(words, activeWordBookId);
             }
         } else if (mode === '2') { // Smart Review (General - Placeholder for now)
             // TODO: Real review logic based on UserProgress
             // For now, let's just pick 20 random words to prevent crash
             description = 'Smart Review';
             const words = await prisma.word.findMany({
+                where: { wordBookId: activeWordBookId },
                 take: 20,
                 orderBy: { id: 'asc' } // Placeholder
             });
             // Ideally: fetch from UserProgress where nextReviewDate <= now
-            questions = await generateQuestions(words);
+            questions = await generateQuestions(words, activeWordBookId);
 
         } else if (mode === '7') { // Smart Mistake Review
             description = 'Smart Mistake Review';
 
-            // 1. Get all words with error history
+            // 1. Get all words with error history FOR THIS USER
             const errorLogs = await prisma.reviewLog.findMany({
-                where: { isCorrect: false },
+                where: { isCorrect: false, userId: userId },
                 select: { wordId: true },
                 distinct: ['wordId']
             });
@@ -98,9 +112,12 @@ export async function POST(request: Request) {
 
             const candidateIds = errorLogs.map(l => l.wordId);
 
-            // 2. Check progress
+            // 2. Check progress FOR THIS USER
             const progressList = await prisma.userProgress.findMany({
-                where: { wordId: { in: candidateIds } }
+                where: {
+                    wordId: { in: candidateIds },
+                    userId: userId
+                }
             });
             const progressMap = new Map();
             progressList.forEach(p => progressMap.set(p.wordId, p));
@@ -160,13 +177,17 @@ export async function POST(request: Request) {
             const wordMap = new Map(words.map(w => [w.id, w]));
             const orderedWords = finalIds.map(id => wordMap.get(id)).filter(w => w !== undefined);
 
-            questions = await generateQuestions(orderedWords);
+            // Filter out words that might belong to other book (though unlikely via ReviewLog if pure)
+            const filteredOrderedWords = orderedWords.filter(w => w.wordBookId === activeWordBookId);
+
+            questions = await generateQuestions(filteredOrderedWords, activeWordBookId);
 
         } else if (mode === '3') { // Random
             const limit = parseInt(params.limit) || 20;
             description = 'Random Practice';
-            const words = await prisma.$queryRaw<any[]>`SELECT * FROM "Word" ORDER BY RANDOM() LIMIT ${limit}`;
-            questions = await generateQuestions(words);
+            // Random query with Prisma + SQLite
+            const words = await prisma.$queryRaw<any[]>`SELECT * FROM "Word" WHERE wordBookId = ${activeWordBookId} ORDER BY RANDOM() LIMIT ${limit}`;
+            questions = await generateQuestions(words, activeWordBookId);
 
         } else if (mode === '5' || mode === '6') { // Select Words (or old logic)
             const ids = params.ids; // comma separated string?
@@ -176,9 +197,9 @@ export async function POST(request: Request) {
                 const idArray = ids.split(',').map((id: string) => parseInt(id)).filter((n: number) => !isNaN(n));
                 if (idArray.length > 0) {
                     const words = await prisma.word.findMany({
-                        where: { id: { in: idArray } }
+                        where: { id: { in: idArray }, wordBookId: activeWordBookId }
                     });
-                    questions = await generateQuestions(words);
+                    questions = await generateQuestions(words, activeWordBookId);
                 }
             }
         }
@@ -195,6 +216,7 @@ export async function POST(request: Request) {
                 totalCount: questions.length,
                 content: JSON.stringify(questions),
                 progress: JSON.stringify({ masteredIds: [] }),
+                userId: userId
             }
         });
 
@@ -207,12 +229,19 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
+    const userIdHeader = request.headers.get('x-user-id');
+    if (!userIdHeader) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = parseInt(userIdHeader);
+
     const { searchParams } = new URL(request.url);
     const dateStr = searchParams.get('date');
 
     if (!dateStr) {
         // Return all tasks or recent? For now let's require date or return recent 20
         const tasks = await prisma.task.findMany({
+            where: { userId: userId },
             orderBy: { createdAt: 'desc' },
             take: 20
         });
@@ -227,7 +256,8 @@ export async function GET(request: Request) {
             createdAt: {
                 gte: startOfDay,
                 lte: endOfDay
-            }
+            },
+            userId: userId
         },
         orderBy: { createdAt: 'desc' }
     });
@@ -236,11 +266,11 @@ export async function GET(request: Request) {
 }
 
 // Helper to generate questions with options
-async function generateQuestions(words: any[]) {
+async function generateQuestions(words: any[], activeWordBookId: number) {
     return await Promise.all(words.map(async (word) => {
         const distractors = await prisma.$queryRaw<Array<{ meaning: String }>>`
             SELECT meaning FROM "Word" 
-            WHERE id != ${word.id} 
+            WHERE id != ${word.id} AND wordBookId = ${activeWordBookId}
             ORDER BY RANDOM() 
             LIMIT 3
         `;

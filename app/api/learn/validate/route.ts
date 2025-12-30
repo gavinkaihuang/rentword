@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const fromInput = searchParams.get('from') || '';
         const toInput = searchParams.get('to') || '';
+
+        const cookieStore = await cookies();
+        const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
 
         if (!fromInput) {
             return NextResponse.json({ error: 'Missing start input' }, { status: 400 });
@@ -19,7 +23,8 @@ export async function GET(request: Request) {
                 where: {
                     spelling: {
                         startsWith: fromInput
-                    }
+                    },
+                    wordBookId: activeWordBookId
                 },
                 orderBy: {
                     orderIndex: 'asc'
@@ -28,7 +33,7 @@ export async function GET(request: Request) {
         } else {
             // Exact match attempt first
             startWord = await prisma.word.findFirst({
-                where: { spelling: fromInput }
+                where: { spelling: fromInput, wordBookId: activeWordBookId }
             });
             // If strict exact match fails, could try startsWith? 
             // Requirement says "Is this word as start". Usually implies exact or closest.
@@ -36,7 +41,7 @@ export async function GET(request: Request) {
         }
 
         if (!startWord) {
-            return NextResponse.json({ error: `Start word "${fromInput}" not found.` }, { status: 404 });
+            return NextResponse.json({ error: `Start word "${fromInput}" not found in current book.` }, { status: 404 });
         }
 
         // 2. Resolve End Word
@@ -45,7 +50,7 @@ export async function GET(request: Request) {
 
         if (toInput) {
             endWord = await prisma.word.findFirst({
-                where: { spelling: toInput }
+                where: { spelling: toInput, wordBookId: activeWordBookId }
             });
         }
 
@@ -66,6 +71,7 @@ export async function GET(request: Request) {
 
             const words = await prisma.word.findMany({
                 where: {
+                    wordBookId: activeWordBookId,
                     orderIndex: {
                         gte: startWord.orderIndex
                     }
@@ -86,6 +92,7 @@ export async function GET(request: Request) {
         // Let's count properly.
         const count = await prisma.word.count({
             where: {
+                wordBookId: activeWordBookId,
                 orderIndex: {
                     gte: startWord.orderIndex,
                     lte: endWord.orderIndex

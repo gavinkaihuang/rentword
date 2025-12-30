@@ -18,14 +18,33 @@ export default function LetterStatsPage() {
     const router = useRouter();
     const [stats, setStats] = useState<LetterStat[]>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
+    const [wordBooks, setWordBooks] = useState<any[]>([]);
 
     useEffect(() => {
-        fetchStats();
+        // Fetch available books and initial active book
+        Promise.all([
+            fetch('/api/wordbooks').then(res => res.json()),
+            // We can just rely on the first fetchStats (no arg) to get default, 
+            // but we want the dropdown to show the correct default.
+            // We can guess the default is the cookie one, but simpler is to fetching active again?
+            // Or better: fetchStats() first (uses cookie), then set selectedBookId to active from metadata if API returned it?
+            // API doesn't return active ID.
+            // Let's fetch active book ID separately to set initial state correctly.
+            fetch('/api/wordbooks/active').then(res => res.json())
+        ]).then(([booksData, activeData]) => {
+            setWordBooks(booksData.wordBooks || []);
+            const defaultId = activeData.activeWordBookId || (booksData.wordBooks?.[0]?.id);
+            setSelectedBookId(defaultId);
+            fetchStats(defaultId);
+        }).catch(e => console.error(e));
     }, []);
 
-    const fetchStats = async () => {
+    const fetchStats = async (bookId?: number) => {
+        setLoading(true);
         try {
-            const res = await fetch('/api/stats/letters');
+            const url = bookId ? `/api/stats/letters?wordBookId=${bookId}` : '/api/stats/letters';
+            const res = await fetch(url);
             const data = await res.json();
             if (data.stats) {
                 setStats(data.stats);
@@ -35,6 +54,12 @@ export default function LetterStatsPage() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleBookChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const id = parseInt(e.target.value);
+        setSelectedBookId(id);
+        fetchStats(id);
     };
 
     const formatDate = (isoString: string | null) => {
@@ -52,11 +77,34 @@ export default function LetterStatsPage() {
     return (
         <div className="min-h-screen bg-[#e1e2e7] flex flex-col p-4 md:p-8">
             <div className="max-w-6xl w-full mx-auto">
-                <div className="flex justify-between items-center mb-8">
-                    <button onClick={() => router.push('/')} className="text-[#565f89] hover:text-[#343b58] flex items-center gap-2">
-                        ← Back Home
-                    </button>
-                    <h1 className="text-3xl font-bold text-[#343b58]">📊 A-Z Statistics</h1>
+                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                    <div className="flex items-center gap-4 w-full md:w-auto">
+                        <button onClick={() => router.push('/')} className="text-[#565f89] hover:text-[#343b58] flex items-center gap-2">
+                            ← Back Home
+                        </button>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row items-center gap-4">
+                        <h1 className="text-3xl font-bold text-[#343b58]">📊 A-Z Statistics</h1>
+
+                        {/* Book Selector */}
+                        <div className="relative">
+                            <select
+                                value={selectedBookId || ''}
+                                onChange={handleBookChange}
+                                className="appearance-none bg-white border border-[#c0caf5] px-4 py-2 pr-8 rounded-lg text-[#34548a] font-bold cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#34548a] shadow-sm"
+                            >
+                                {wordBooks.map(book => (
+                                    <option key={book.id} value={book.id}>
+                                        📚 {book.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#34548a]">
+                                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {loading ? (
@@ -97,7 +145,9 @@ export default function LetterStatsPage() {
                                                 </div>
                                             </td>
                                             <td className="p-4 text-sm text-[#9aa5ce] font-mono">
-                                                {formatDate(stat.lastStudied)}
+                                                <span suppressHydrationWarning>
+                                                    {formatDate(stat.lastStudied)}
+                                                </span>
                                             </td>
                                             <td className="p-4 text-right pr-6">
                                                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${getErrorColor(stat.errorRate)}`}>

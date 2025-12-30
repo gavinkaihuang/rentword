@@ -3,6 +3,12 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 export async function GET(request: Request) {
+    const userIdHeader = request.headers.get('x-user-id');
+    if (!userIdHeader) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = parseInt(userIdHeader);
+
     const { searchParams } = new URL(request.url);
     const dateStr = searchParams.get('date'); // YYYY-MM-DD
 
@@ -22,7 +28,8 @@ export async function GET(request: Request) {
                 createdAt: {
                     gte: startOfDay,
                     lte: endOfDay
-                }
+                },
+                userId // Filter by user
             },
             include: {
                 word: true
@@ -57,7 +64,8 @@ export async function GET(request: Request) {
                 createdAt: {
                     gte: startOfDay,
                     lte: endOfDay
-                }
+                },
+                userId // Filter by user
             }
         });
 
@@ -77,7 +85,8 @@ export async function GET(request: Request) {
         const mistakeLogs = await prisma.reviewLog.findMany({
             where: {
                 wordId: { in: wordIds },
-                isCorrect: false
+                isCorrect: false,
+                userId // Filter by user
             },
             select: { wordId: true },
             distinct: ['wordId']
@@ -87,7 +96,10 @@ export async function GET(request: Request) {
 
         // Fetch their progress
         const progressList = await prisma.userProgress.findMany({
-            where: { wordId: { in: mistakeIds } }
+            where: {
+                wordId: { in: mistakeIds },
+                userId // Filter by user
+            }
         });
         const progressMap = new Map();
         progressList.forEach(p => progressMap.set(p.wordId, p));

@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const idsStr = searchParams.get('ids');
+
+        const cookieStore = await cookies();
+        const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
 
         if (!idsStr) {
             return NextResponse.json({ error: 'Missing word IDs' }, { status: 400 });
@@ -19,9 +23,8 @@ export async function GET(request: Request) {
         // Fetch words
         const words = await prisma.word.findMany({
             where: {
-                id: {
-                    in: ids
-                }
+                id: { in: ids },
+                wordBookId: activeWordBookId
             }
         });
 
@@ -29,7 +32,7 @@ export async function GET(request: Request) {
         const questions = await Promise.all(words.map(async (word) => {
             const distractors = await prisma.$queryRaw<Array<{ meaning: String }>>`
                 SELECT meaning FROM "Word" 
-                WHERE id != ${word.id} 
+                WHERE id != ${word.id} AND wordBookId = ${activeWordBookId}
                 ORDER BY RANDOM() 
                 LIMIT 3
             `;

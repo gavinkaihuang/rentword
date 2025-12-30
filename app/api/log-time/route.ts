@@ -3,6 +3,12 @@ import prisma from '@/lib/prisma';
 
 export async function POST(request: Request) {
     try {
+        const userIdHeader = request.headers.get('x-user-id');
+        if (!userIdHeader) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        const userId = parseInt(userIdHeader);
+
         const { duration, type } = await request.json();
 
         if (!duration || !type) {
@@ -13,6 +19,7 @@ export async function POST(request: Request) {
             data: {
                 duration,
                 type, // 'LEARN' or 'EXERCISE'
+                userId
             },
         });
 

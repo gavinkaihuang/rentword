@@ -4,6 +4,12 @@ import { calculateNextReview } from '@/lib/srs';
 
 export async function POST(request: Request) {
     try {
+        const userIdHeader = request.headers.get('x-user-id');
+        if (!userIdHeader) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        const userId = parseInt(userIdHeader);
+
         const body = await request.json();
         const { wordId, isCorrect } = body;
 
@@ -11,10 +17,11 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing wordId or isCorrect' }, { status: 400 });
         }
 
-        // 1. Get current progress (upsert logic basically, but we need current val)
-        // We can findUnique first
+        // 1. Get current progress
         let progress = await prisma.userProgress.findUnique({
-            where: { wordId },
+            where: {
+                userId_wordId: { userId, wordId }
+            },
         });
 
         // Default values if not found
@@ -25,18 +32,21 @@ export async function POST(request: Request) {
         const result = calculateNextReview(currentProficiency, currentConsecutive, isCorrect);
 
         // 3. Update or Create
-        // 3. Update or Create
         const [updated] = await prisma.$transaction([
             prisma.userProgress.upsert({
-                where: { wordId },
+                where: {
+                    userId_wordId: { userId, wordId }
+                },
                 update: {
                     proficiency: result.proficiency,
                     nextReviewDate: result.nextReviewDate,
                     consecutiveCorrect: result.consecutiveCorrect,
                     lastReviewed: new Date(),
+                    // userId is safely invariant, no update needed
                 },
                 create: {
                     wordId,
+                    userId,
                     proficiency: result.proficiency,
                     nextReviewDate: result.nextReviewDate,
                     consecutiveCorrect: result.consecutiveCorrect,
@@ -46,6 +56,7 @@ export async function POST(request: Request) {
             prisma.reviewLog.create({
                 data: {
                     wordId,
+                    userId,
                     isCorrect
                 }
             })

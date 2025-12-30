@@ -7,6 +7,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String   // Hashed
+  role      String   @default("USER") // ADMIN, USER
+  createdAt DateTime @default(now())
+  
+  tasks         Task[]
+  progress      UserProgress[]
+  reviewLogs    ReviewLog[]
+  studySessions StudySession[]
+}
+
 model Word {
   id          Int      @id @default(autoincrement())
   spelling    String
@@ -16,8 +29,18 @@ model Word {
   example     String?
   orderIndex  Int
   
+  wordBookId  Int?
+  wordBook    WordBook? @relation(fields: [wordBookId], references: [id])
+  
   userProgress UserProgress[]
   reviewLogs   ReviewLog[]
+}
+
+model WordBook {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now())
+  words     Word[]
 }
 
 model UserProgress {
@@ -29,7 +52,10 @@ model UserProgress {
   lastReviewed       DateTime?
   consecutiveCorrect Int       @default(0)
   
-  @@unique([wordId])
+  userId             Int       // Required now
+  user               User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, wordId])
 }
 
 model ReviewLog {
@@ -38,6 +64,9 @@ model ReviewLog {
   word      Word     @relation(fields: [wordId], references: [id])
   isCorrect Boolean
   createdAt DateTime @default(now())
+  
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model StudySession {
@@ -45,6 +74,9 @@ model StudySession {
   createdAt DateTime @default(now())
   duration  Int      // Seconds
   type      String   // 'LEARN' or 'EXERCISE'
+  
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model Task {
@@ -69,4 +101,7 @@ model Task {
   progress      String   @default("{}")
   
   status        String   @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED
+  
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id])
 }

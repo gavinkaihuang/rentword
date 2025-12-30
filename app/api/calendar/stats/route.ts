@@ -3,6 +3,12 @@ import prisma from '@/lib/prisma';
 
 export async function GET(request: Request) {
     try {
+        const userIdHeader = request.headers.get('x-user-id');
+        if (!userIdHeader) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        const userId = parseInt(userIdHeader);
+
         const { searchParams } = new URL(request.url);
         const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString());
         const month = parseInt(searchParams.get('month') || (new Date().getMonth() + 1).toString());
@@ -18,7 +24,8 @@ export async function GET(request: Request) {
                 createdAt: {
                     gte: startOfMonth,
                     lte: endOfMonth
-                }
+                },
+                userId // Filter by user
             },
             select: {
                 createdAt: true,
@@ -42,7 +49,8 @@ export async function GET(request: Request) {
                 createdAt: {
                     gte: startOfMonth,
                     lte: endOfMonth
-                }
+                },
+                userId // Filter by user
             }
         });
 

@@ -1,24 +1,59 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
     try {
+        const userIdHeader = request.headers.get('x-user-id');
+        if (!userIdHeader) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        const userId = parseInt(userIdHeader);
+
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '20');
         const status = searchParams.get('status') || 'unmastered'; // unmastered | mastered
 
+        const cookieStore = await cookies();
+        const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
+
         // 1. Find all words that have EVER had an error (Mistake Book Candidate)
+        // Filter by userId
         const errorLogs = await prisma.reviewLog.findMany({
-            where: { isCorrect: false },
+            where: {
+                isCorrect: false,
+                userId: userId
+            },
             select: { wordId: true, createdAt: true },
             distinct: ['wordId'],
             orderBy: { createdAt: 'desc' }
         });
 
-        const candidateIds = errorLogs.map(l => l.wordId);
+        const allCandidateIds = errorLogs.map(l => l.wordId);
 
-        if (candidateIds.length === 0) {
+        if (allCandidateIds.length === 0) {
+            return NextResponse.json({
+                mistakes: [],
+                pagination: { page, limit, total: 0, totalPages: 0 }
+            });
+        }
+
+        // Filter these IDs by WordBook
+        const wordsInBook = await prisma.word.findMany({
+            where: {
+                id: { in: allCandidateIds },
+                wordBookId: activeWordBookId
+            },
+            select: { id: true }
+        });
+
+        const candidateIds = wordsInBook.map(w => w.id);
+
+        // Re-sort candidateIds based on errorLogs order (recency)
+        const sortedCandidateIds = allCandidateIds.filter(id => candidateIds.includes(id));
+
+        if (sortedCandidateIds.length === 0) {
             return NextResponse.json({
                 mistakes: [],
                 pagination: { page, limit, total: 0, totalPages: 0 }
@@ -27,14 +62,17 @@ export async function GET(request: Request) {
 
         // 2. Fetch Progress for these candidates to determine status
         const progressList = await prisma.userProgress.findMany({
-            where: { wordId: { in: candidateIds } }
+            where: {
+                wordId: { in: sortedCandidateIds },
+                userId: userId
+            }
         });
 
         const progressMap = new Map();
         progressList.forEach(p => progressMap.set(p.wordId, p));
 
         // 3. Filter candidates based on status
-        const filteredIds = candidateIds.filter(id => {
+        const filteredIds = sortedCandidateIds.filter(id => {
             const p = progressMap.get(id);
             const consecutive = p?.consecutiveCorrect || 0;
 
@@ -57,7 +95,8 @@ export async function GET(request: Request) {
             by: ['wordId'],
             where: {
                 wordId: { in: paginatedIds },
-                isCorrect: false
+                isCorrect: false,
+                userId: userId
             },
             _count: { _all: true },
             _max: { createdAt: true }
