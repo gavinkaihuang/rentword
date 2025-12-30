@@ -32,6 +32,50 @@ interface Question {
     reverseOptions?: { label: string; isCorrect: boolean }[];
 }
 
+function FormattedMeaning({ text, spelling }: { text: string; spelling: string }) {
+    if (!text) return null;
+
+    // Split by Part of Speech (n. vt. adj. etc.)
+    // Regex looks for standard abbreviations followed by a dot, preceded by start or space
+    // Refined splitting strategy: Match POS tags not preceded by letters (to avoid matching inside words like 'creation.')
+    // This captures n. vt. etc. when preceded by space, Chinese, numbers, or start of line.
+    const processedMeaning = text.replace(
+        /(^|[^a-zA-Z])(n\.|v\.|vi\.|vt\.|adj\.|adv\.|prep\.|pron\.|conj\.|int\.|num\.|abbr\.|art\.)/gi,
+        '$1|POS|$2'
+    );
+
+    let lines = processedMeaning.split('|POS|').map(l => l.trim()).filter(l => l);
+
+    // If no splits (no POS tags found), fallback to semicolon for basic structure
+    if (lines.length === 1 && lines[0] === text.trim()) {
+        lines = text.split(/[;；]/).map(l => l.trim()).filter(l => l);
+    }
+
+    return (
+        <div>
+            {lines.map((line, lineIdx) => {
+                const trimmedLine = line.trim();
+                if (!trimmedLine) return null;
+
+                // Highlight spelling in each line
+                return (
+                    <div key={lineIdx} className={lineIdx > 0 ? "mt-1" : ""}>
+                        {(() => {
+                            if (!spelling) return trimmedLine;
+                            const parts = trimmedLine.split(new RegExp(`(${spelling})`, 'gi'));
+                            return parts.map((part, i) =>
+                                part.toLowerCase() === spelling.toLowerCase()
+                                    ? <span key={i} className="text-[#8c4351] font-bold mx-0.5 bg-[#f4dbd6] px-1 rounded">{part}</span>
+                                    : part
+                            );
+                        })()}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
 function QuizContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -536,46 +580,10 @@ function QuizContent() {
                                                 <div className={`mt-6 px-5 py-4 border-l-4 border-[#8c4351] bg-[#fffcfb] rounded-r-lg shadow-sm ${hideMeaning && !isMastered && !isLearned ? 'blur-md select-none' : ''}`}>
                                                     <span className="block text-xs font-bold text-[#94a3b8] mb-1 uppercase tracking-wider">Meaning (基本释义)</span>
                                                     <div className="text-[#334155] text-xl font-medium leading-relaxed">
-                                                        {(() => {
-                                                            const rawMeaning = q.word.meaning || correctOption?.meaning || '';
-                                                            const spelling = q.word.spelling;
-
-                                                            // Split by Part of Speech (n. vt. adj. etc.)
-                                                            // Regex looks for standard abbreviations followed by a dot, preceded by start or space
-                                                            // Refined splitting strategy: Match POS tags not preceded by letters (to avoid matching inside words like 'creation.')
-                                                            // This captures n. vt. etc. when preceded by space, Chinese, numbers, or start of line.
-                                                            const processedMeaning = rawMeaning.replace(
-                                                                /(^|[^a-zA-Z])(n\.|v\.|vi\.|vt\.|adj\.|adv\.|prep\.|pron\.|conj\.|int\.|num\.|abbr\.|art\.)/gi,
-                                                                '$1|POS|$2'
-                                                            );
-
-                                                            let lines = processedMeaning.split('|POS|').map(l => l.trim()).filter(l => l);
-
-                                                            // If no splits (no POS tags found), fallback to semicolon for basic structure
-                                                            if (lines.length === 1 && lines[0] === rawMeaning.trim()) {
-                                                                lines = rawMeaning.split(/[;；]/).map(l => l.trim()).filter(l => l);
-                                                            }
-
-                                                            return lines.map((line, lineIdx) => {
-                                                                const trimmedLine = line.trim();
-                                                                if (!trimmedLine) return null;
-
-                                                                // Highlight spelling in each line
-                                                                return (
-                                                                    <div key={lineIdx} className={lineIdx > 0 ? "mt-1" : ""}>
-                                                                        {(() => {
-                                                                            if (!spelling) return trimmedLine;
-                                                                            const parts = trimmedLine.split(new RegExp(`(${spelling})`, 'gi'));
-                                                                            return parts.map((part, i) =>
-                                                                                part.toLowerCase() === spelling.toLowerCase()
-                                                                                    ? <span key={i} className="text-[#8c4351] font-bold mx-0.5 bg-[#f4dbd6] px-1 rounded">{part}</span>
-                                                                                    : part
-                                                                            );
-                                                                        })()}
-                                                                    </div>
-                                                                );
-                                                            });
-                                                        })()}
+                                                        <FormattedMeaning
+                                                            text={q.word.meaning || correctOption?.meaning || ''}
+                                                            spelling={q.word.spelling}
+                                                        />
                                                     </div>
                                                 </div>
                                             )}
@@ -729,7 +737,13 @@ function QuizContent() {
                                             )}
                                         </div>
                                         <div className={`text-[#565f89] ${hideMeaning && !isMastered && !isLearned ? 'blur-md select-none' : ''}`}>
-                                            {q.word.wordBookId !== 3 && correctOption?.meaning}
+                                            {/* Fix: Use FormattedMeaning for simple view as well */}
+                                            {q.word.wordBookId !== 3 && (
+                                                <FormattedMeaning
+                                                    text={correctOption?.meaning || ''}
+                                                    spelling={q.word.spelling}
+                                                />
+                                            )}
                                         </div>
                                     </div>
 
