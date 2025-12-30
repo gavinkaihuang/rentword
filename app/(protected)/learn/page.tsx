@@ -17,6 +17,14 @@ interface Question {
         phonetic?: string;
         grammar?: string;
         example?: string;
+        roots?: string;
+        affixes?: string;
+        history?: string;
+        variations?: string;
+        mnemonic?: string;
+        story?: string;
+        wordBookId?: number;
+        meaning?: string;
     };
     options: Option[];
     // For reverse mode override
@@ -136,6 +144,11 @@ function QuizContent() {
 
             if (data.task) {
                 const questions = JSON.parse(data.task.content);
+                console.log('[Frontend Debug] Loaded Questions:', questions);
+                if (questions.length > 0) {
+                    console.log('[Frontend Debug] Sample Word:', questions[0].word);
+                }
+
                 const taskProgress = JSON.parse(data.task.progress || '{}');
                 const previousMasteredIds = new Set<number>(taskProgress.masteredIds || []);
 
@@ -405,7 +418,7 @@ function QuizContent() {
     if (view === 'preview') {
         const remainingCount = previewQuestions.length - masteredIds.size;
         return (
-            <div className="min-h-screen bg-[#e1e2e7] p-4 md:p-8 flex flex-col items-center">
+            <div className="min-h-screen bg-[#d1d5db] p-4 md:p-8 flex flex-col items-center">
                 <div className="max-w-6xl w-full">
                     <div className="flex justify-between items-center mb-6">
                         <button onClick={() => router.push('/')} className="text-[#565f89] hover:text-[#343b58]">
@@ -456,30 +469,39 @@ function QuizContent() {
                             const mistakeStatus = mistakeStatusMap[q.word.id]; // 'resolved' | 'unresolved' | undefined
                             const correctOption = q.options.find(o => o.isCorrect);
 
+                            // Alternating gray backgrounds (Odd/Even) for eye comfort
+                            const cardBg = isMastered ? 'bg-[#e9f5f4]' : isLearned ? 'bg-[#eef1f8]' : (idx % 2 === 0 ? 'bg-[#f2f3f5]' : 'bg-[#e3e5e8]');
+
                             return (
                                 <div
                                     key={q.word.id}
-                                    className={`bg-[#d5d6db] rounded-xl p-4 shadow-sm border transition-all ${isMastered ? 'border-[#33635c] bg-[#e9f5f4] opacity-80' :
-                                        isLearned ? 'border-[#34548a] bg-[#eef1f8] opacity-90' : 'border-[#cfc9c2] hover:shadow-md'
+                                    className={`${cardBg} rounded-xl p-4 shadow-sm border transition-all ${isMastered ? 'border-[#33635c] opacity-80' :
+                                        isLearned ? 'border-[#34548a] opacity-90' : 'border-[#cfc9c2] hover:shadow-md'
                                         }`}
                                 >
-                                    <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                                    <div className={`flex-grow grid grid-cols-1 ${q.word.wordBookId === 3 ? 'grid-cols-1' : 'md:grid-cols-2'} gap-4 items-center`}>
                                         <div className="flex flex-col">
-                                            <div className="flex items-center">
-                                                <span className="text-[#9aa5ce] font-mono mr-6 w-12 text-right text-lg">#{q.word.orderIndex || idx + 1}</span>
-                                                <div className="flex flex-col">
-                                                    <div className="flex items-center gap-3">
+                                            <div className="flex items-center w-full">
+                                                <span className="text-[#9aa5ce] font-mono mr-4 w-14 text-right text-lg shrink-0">#{q.word.orderIndex || idx + 1}</span>
+                                                <div className="flex flex-col mr-4">
+                                                    <div className="flex items-center gap-2">
                                                         <span className={`text-xl font-bold ${hideSpelling && !isMastered && !isLearned ? 'blur-md select-none' : 'text-[#343b58]'}`}>
                                                             {q.word.spelling}
                                                         </span>
                                                         <button
-                                                            onClick={(e) => { e.stopPropagation(); toggleLearned(q.word.id); }}
-                                                            className={`px-2 py-0.5 rounded text-xs font-bold border transition-colors ${isLearned
-                                                                ? 'bg-[#eef1f8] text-[#34548a] border-[#34548a] hover:bg-[#d0d8e8]'
-                                                                : 'bg-[#d5d6db] text-[#565f89] border-[#cfc9c2] hover:border-[#343b58] hover:text-[#343b58]'
-                                                                }`}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const utterance = new SpeechSynthesisUtterance(q.word.spelling);
+                                                                utterance.lang = 'en-US';
+                                                                window.speechSynthesis.speak(utterance);
+                                                            }}
+                                                            className="text-[#94a3b8] hover:text-[#34548a] transition-colors p-1.5 rounded-full hover:bg-black/5"
+                                                            title="Play Pronunciation"
                                                         >
-                                                            {isLearned ? '✓ Licensed' : 'Mark Known'}
+                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                                                                <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 001.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.561.276 2.561-1.06V4.06zM18.584 5.106a.75.75 0 011.06 0c3.808 3.807 3.808 9.98 0 13.788a.75.75 0 11-1.06-1.06 8.25 8.25 0 000-11.668.75.75 0 010-1.06z" />
+                                                                <path d="M15.932 7.757a.75.75 0 011.061 0 6 6 0 010 8.486.75.75 0 01-1.06-1.061 4.5 4.5 0 000-6.364.75.75 0 010-1.06z" />
+                                                            </svg>
                                                         </button>
                                                     </div>
                                                     {q.word.phonetic && (
@@ -498,31 +520,216 @@ function QuizContent() {
                                                         </span>
                                                     )}
                                                 </div>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); toggleLearned(q.word.id); }}
+                                                    className={`ml-auto shrink-0 px-4 py-2 rounded-lg text-sm font-bold border transition-colors shadow-sm ${isLearned
+                                                        ? 'bg-[#eef1f8] text-[#34548a] border-[#34548a] hover:bg-[#d0d8e8]'
+                                                        : 'bg-white text-[#565f89] border-[#cfc9c2] hover:border-[#343b58] hover:text-[#343b58] hover:bg-[#f1f5f9]'
+                                                        }`}
+                                                >
+                                                    {isLearned ? '✓ Known' : 'Mark Known'}
+                                                </button>
                                             </div>
 
-                                            {/* Expanded Info */}
-                                            {(q.word.grammar || q.word.example) && (!hideMeaning || isMastered || isLearned) && (
-                                                <div className="mt-3 ml-16 text-sm text-[#565f89] space-y-2">
-                                                    {q.word.grammar && (
-                                                        <div className="bg-[#e1e2e7] p-2 rounded">
-                                                            <span className="font-bold text-[#343b58] block text-xs uppercase mb-1">Common Grammar</span>
-                                                            <ul className="list-disc list-inside">
-                                                                {q.word.grammar.split(/,|，/).map((item, i) => (
-                                                                    <li key={i} className="text-[#565f89]">{item.trim()}</li>
-                                                                ))}
-                                                            </ul>
-                                                        </div>
-                                                    )}
-                                                    {q.word.example && (
-                                                        <div className="bg-[#e1e2e7] p-2 rounded italic border-l-2 border-[#34548a]">
-                                                            {q.word.example}
-                                                        </div>
-                                                    )}
+                                            {/* Meaning for Rich Content Mode (Book ID 3) - Moved here for full width layout */}
+                                            {q.word.wordBookId === 3 && (
+                                                <div className={`mt-6 px-5 py-4 border-l-4 border-[#8c4351] bg-[#fffcfb] rounded-r-lg shadow-sm ${hideMeaning && !isMastered && !isLearned ? 'blur-md select-none' : ''}`}>
+                                                    <span className="block text-xs font-bold text-[#94a3b8] mb-1 uppercase tracking-wider">Meaning (基本释义)</span>
+                                                    <div className="text-[#334155] text-xl font-medium leading-relaxed">
+                                                        {(() => {
+                                                            const rawMeaning = q.word.meaning || correctOption?.meaning || '';
+                                                            const spelling = q.word.spelling;
+
+                                                            // Split by Part of Speech (n. vt. adj. etc.)
+                                                            // Regex looks for standard abbreviations followed by a dot, preceded by start or space
+                                                            // Refined splitting strategy: Match POS tags not preceded by letters (to avoid matching inside words like 'creation.')
+                                                            // This captures n. vt. etc. when preceded by space, Chinese, numbers, or start of line.
+                                                            const processedMeaning = rawMeaning.replace(
+                                                                /(^|[^a-zA-Z])(n\.|v\.|vi\.|vt\.|adj\.|adv\.|prep\.|pron\.|conj\.|int\.|num\.|abbr\.|art\.)/gi,
+                                                                '$1|POS|$2'
+                                                            );
+
+                                                            let lines = processedMeaning.split('|POS|').map(l => l.trim()).filter(l => l);
+
+                                                            // If no splits (no POS tags found), fallback to semicolon for basic structure
+                                                            if (lines.length === 1 && lines[0] === rawMeaning.trim()) {
+                                                                lines = rawMeaning.split(/[;；]/).map(l => l.trim()).filter(l => l);
+                                                            }
+
+                                                            return lines.map((line, lineIdx) => {
+                                                                const trimmedLine = line.trim();
+                                                                if (!trimmedLine) return null;
+
+                                                                // Highlight spelling in each line
+                                                                return (
+                                                                    <div key={lineIdx} className={lineIdx > 0 ? "mt-1" : ""}>
+                                                                        {(() => {
+                                                                            if (!spelling) return trimmedLine;
+                                                                            const parts = trimmedLine.split(new RegExp(`(${spelling})`, 'gi'));
+                                                                            return parts.map((part, i) =>
+                                                                                part.toLowerCase() === spelling.toLowerCase()
+                                                                                    ? <span key={i} className="text-[#8c4351] font-bold mx-0.5 bg-[#f4dbd6] px-1 rounded">{part}</span>
+                                                                                    : part
+                                                                            );
+                                                                        })()}
+                                                                    </div>
+                                                                );
+                                                            });
+                                                        })()}
+                                                    </div>
                                                 </div>
+                                            )}
+
+                                            {/* Expanded Info */}
+                                            {/* Expanded Info - Conditional Layout */}
+                                            {(!hideMeaning || isMastered || isLearned) && (
+                                                <>
+                                                    {/* NEW STYLE for GPT-8000 (ID 3) */}
+                                                    {q.word.wordBookId === 3 ? (
+                                                        <div className="mt-8 ml-0 space-y-8">
+
+                                                            {/* Section B: Etymology & Depth */}
+                                                            {(q.word.roots || q.word.affixes || q.word.history) && (
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                    {q.word.roots && (
+                                                                        <div className="relative bg-white pt-6 pb-4 px-5 rounded-xl border border-[#cbd5e1] hover:border-[#94a3b8] transition-colors">
+                                                                            <div className="absolute -top-3 left-4 bg-[#64748b] text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-sm tracking-wide">
+                                                                                🌳 词根 (Root)
+                                                                            </div>
+                                                                            <p className="text-[#475569] text-base leading-relaxed font-sans">{q.word.roots}</p>
+                                                                        </div>
+                                                                    )}
+                                                                    {q.word.affixes && (
+                                                                        <div className="relative bg-[#f5f2f0] p-4 rounded-lg border border-[#cfc9c2]">
+                                                                            <div className="absolute -top-3 left-3 bg-[#33635c] text-white px-2 py-0.5 rounded text-xs font-bold shadow-sm">
+                                                                                🧩 词缀 (Affixes)
+                                                                            </div>
+                                                                            <p className="mt-2 text-[#565f89] text-sm leading-relaxed">{q.word.affixes}</p>
+                                                                        </div>
+                                                                    )}
+                                                                    {q.word.history && (
+                                                                        <div className="col-span-1 md:col-span-2 relative bg-[#f2f3f5] p-4 rounded-lg border border-[#cfc9c2] italic">
+                                                                            <div className="absolute -top-3 left-3 bg-[#565f89] text-white px-2 py-0.5 rounded text-xs font-bold shadow-sm">
+                                                                                📜 历史与文化 (History)
+                                                                            </div>
+                                                                            <p className="mt-2 text-[#565f89] text-sm leading-relaxed not-italic">{q.word.history}</p>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
+                                                            {/* Section C: Memory Aids */}
+                                                            {(q.word.mnemonic || q.word.story) && (
+                                                                <div className="grid grid-cols-1 gap-6">
+                                                                    {q.word.mnemonic && (
+                                                                        <div className="relative bg-[#f0fdf4] pt-6 pb-4 px-5 rounded-xl border border-[#bbf7d0] shadow-sm">
+                                                                            <div className="absolute -top-3 left-4 bg-[#15803d] text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-sm tracking-wide">
+                                                                                💡 记忆辅助 (Mnemonic)
+                                                                            </div>
+                                                                            <p className="text-[#166534] text-base leading-relaxed font-medium">{q.word.mnemonic}</p>
+                                                                        </div>
+                                                                    )}
+                                                                    {q.word.story && (
+                                                                        <div className="relative bg-[#eff6ff] pt-6 pb-4 px-5 rounded-xl border border-[#bfdbfe] shadow-sm">
+                                                                            <div className="absolute -top-3 left-4 bg-[#1d4ed8] text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-sm tracking-wide">
+                                                                                📖 小故事 (Story)
+                                                                            </div>
+                                                                            <p className="text-[#1e40af] text-base leading-relaxed italic">"{q.word.story}"</p>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
+                                                            {/* Section D: Practical Usage */}
+                                                            <div className="space-y-6 pt-6 border-t border-[#cbd5e1] mt-2">
+                                                                {q.word.variations && (
+                                                                    <div className="relative bg-white pt-6 pb-4 px-5 rounded-xl border border-[#cbd5e1] hover:border-[#94a3b8] transition-colors">
+                                                                        <div className="absolute -top-3 left-4 bg-[#475569] text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-sm tracking-wide">
+                                                                            🔄 变形 (Variations)
+                                                                        </div>
+                                                                        <p className="text-[#475569] text-base leading-relaxed font-sans">{q.word.variations}</p>
+                                                                    </div>
+                                                                )}
+                                                                {q.word.grammar && (
+                                                                    <div className="relative bg-white pt-6 pb-4 px-5 rounded-xl border border-[#cbd5e1] hover:border-[#94a3b8] transition-colors">
+                                                                        <div className="absolute -top-3 left-4 bg-[#334155] text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-sm tracking-wide">
+                                                                            ⚖️ 常用语法 (Grammar)
+                                                                        </div>
+                                                                        <p className="text-[#475569] text-base leading-relaxed font-sans">{q.word.grammar}</p>
+                                                                    </div>
+                                                                )}
+                                                                {q.word.example && (
+                                                                    <div className="relative bg-[#f8fafc] pt-7 pb-5 px-5 rounded-xl border border-[#cbd5e1] shadow-sm">
+                                                                        <div className="absolute -top-3 left-4 bg-[#3b82f6] text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-sm tracking-wide">
+                                                                            🗣️ 例句 (Examples)
+                                                                        </div>
+                                                                        <div className="text-[#334155] space-y-3">
+                                                                            {q.word.example.match(/\d+\./)
+                                                                                ? q.word.example.split(/(?=\d+\.)/).map((line, i) => (
+                                                                                    line.trim() && (
+                                                                                        <div key={i} className="leading-relaxed pl-2 border-l-2 border-[#bfdbfe]">
+                                                                                            {line.trim()}
+                                                                                        </div>
+                                                                                    )
+                                                                                ))
+                                                                                : <p className="leading-relaxed">{q.word.example}</p>
+                                                                            }
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        /* OLD STYLE (Preserved for other books) */
+                                                        <div className="mt-6 space-y-6">
+                                                            {/* Simplified view for standard words with upgraded UI */}
+                                                            {q.word.roots && (
+                                                                <div className="relative bg-[#f1f5f9] pt-6 pb-4 px-5 rounded-xl border border-[#cbd5e1] shadow-sm">
+                                                                    <div className="absolute -top-3 left-4 bg-[#64748b] text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-sm tracking-wide">
+                                                                        🌱 词根 analysis
+                                                                    </div>
+                                                                    <p className="text-[#475569] text-base leading-relaxed font-sans">{q.word.roots}</p>
+                                                                </div>
+                                                            )}
+                                                            {q.word.grammar && (
+                                                                <div className="relative bg-white pt-6 pb-4 px-5 rounded-xl border border-[#cbd5e1] hover:border-[#94a3b8] transition-colors">
+                                                                    <div className="absolute -top-3 left-4 bg-[#334155] text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-sm tracking-wide">
+                                                                        ⚖️ 常用语法 (Grammar)
+                                                                    </div>
+                                                                    <ul className="list-disc list-inside text-[#475569] text-base leading-relaxed font-sans">
+                                                                        {q.word.grammar.split(/,|，/).map((item, i) => (
+                                                                            <li key={i}>{item.trim()}</li>
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
+                                                            )}
+                                                            {q.word.example && (
+                                                                <div className="relative bg-[#f8fafc] pt-7 pb-5 px-5 rounded-xl border border-[#cbd5e1] shadow-sm">
+                                                                    <div className="absolute -top-3 left-4 bg-[#3b82f6] text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-sm tracking-wide">
+                                                                        🗣️ 例句 (Examples)
+                                                                    </div>
+                                                                    <div className="text-[#334155] space-y-3">
+                                                                        {/* Try splitter logic on standard words too */}
+                                                                        {q.word.example.match(/\d+\./)
+                                                                            ? q.word.example.split(/(?=\d+\.)/).map((line, i) => (
+                                                                                line.trim() && (
+                                                                                    <div key={i} className="leading-relaxed pl-2 border-l-2 border-[#bfdbfe]">
+                                                                                        {line.trim()}
+                                                                                    </div>
+                                                                                )
+                                                                            ))
+                                                                            : <p className="leading-relaxed italic">"{q.word.example}"</p>
+                                                                        }
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                         <div className={`text-[#565f89] ${hideMeaning && !isMastered && !isLearned ? 'blur-md select-none' : ''}`}>
-                                            {correctOption?.meaning}
+                                            {q.word.wordBookId !== 3 && correctOption?.meaning}
                                         </div>
                                     </div>
 

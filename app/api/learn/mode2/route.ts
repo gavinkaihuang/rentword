@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { cookies } from 'next/headers';
+import { formatWordForTask } from '@/lib/word-utils';
 
 export async function GET(request: Request) {
     try {
@@ -8,13 +10,17 @@ export async function GET(request: Request) {
         // So priority: nextReviewDate <= now OR proficiency == 0 (if valid?)
         // Actually SRS handles "nextReviewDate". If wrong, it's due immediately.
 
-        // Fetch top 20 due words
+        const cookieStore = await cookies();
+        const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
         const now = new Date();
 
         const progressItems = await prisma.userProgress.findMany({
             where: {
                 nextReviewDate: {
                     lte: now
+                },
+                word: {
+                    wordBookId: activeWordBookId
                 }
             },
             orderBy: {
@@ -54,10 +60,7 @@ export async function GET(request: Request) {
             const shuffledOptions = options.sort(() => Math.random() - 0.5);
 
             return {
-                word: {
-                    id: word.id,
-                    spelling: word.spelling
-                },
+                word: formatWordForTask(word),
                 options: shuffledOptions.map(o => ({ meaning: o.value, isCorrect: o.isCorrect }))
             };
         }));

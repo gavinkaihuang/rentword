@@ -1,14 +1,20 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { cookies } from 'next/headers';
+import { formatWordForTask } from '@/lib/word-utils';
 
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const limit = parseInt(searchParams.get('limit') || '10');
 
+        const cookieStore = await cookies();
+        const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
+
         // Fetch random words
         const words = await prisma.$queryRaw<Array<{ id: number, spelling: string, meaning: string, orderIndex: number }>>`
       SELECT * FROM "Word"
+      WHERE wordBookId = ${activeWordBookId}
       ORDER BY RANDOM()
       LIMIT ${limit}
     `;
@@ -29,11 +35,7 @@ export async function GET(request: Request) {
             const shuffledOptions = options.sort(() => Math.random() - 0.5);
 
             return {
-                word: {
-                    id: word.id,
-                    spelling: word.spelling,
-                    orderIndex: word.orderIndex
-                },
+                word: formatWordForTask(word),
                 options: shuffledOptions.map(o => ({ meaning: o.value, isCorrect: o.isCorrect }))
             };
         }));

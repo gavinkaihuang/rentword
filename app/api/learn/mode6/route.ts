@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { cookies } from 'next/headers';
+import { formatWordForTask } from '@/lib/word-utils';
 
 export async function GET(request: Request) {
     try {
@@ -45,11 +46,7 @@ export async function GET(request: Request) {
             const shuffledOptions = options.sort(() => Math.random() - 0.5);
 
             return {
-                word: {
-                    id: word.id,
-                    spelling: word.spelling,
-                    orderIndex: (word as any).orderIndex
-                },
+                word: formatWordForTask(word),
                 options: shuffledOptions.map(o => ({ meaning: o.value, isCorrect: o.isCorrect }))
             };
         }));

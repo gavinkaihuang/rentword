@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { cookies } from 'next/headers';
+import { formatWordForTask } from '@/lib/word-utils';
 
 export async function POST(request: Request) {
     try {
@@ -265,32 +266,67 @@ export async function GET(request: Request) {
     return NextResponse.json({ tasks });
 }
 
+// Helper to escape regex special characters
+function escapeRegExp(string: string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Helper to sanitize meaning by masking the spelling
+function sanitizeMeaning(meaning: string, spelling: string) {
+    if (!meaning || !spelling) return meaning;
+    try {
+        const escapedSpelling = escapeRegExp(spelling);
+        // Match the word with boundaries, case-insensitive
+        // We use a broader boundary check or just replace known occurrences if simple \b isn't enough for "A.M."
+        // For "A.M.", \bA\.M\.\b might fail at the end.
+        // Let's try a simpler approach: replace the literal string if it's surrounded by non-word chars or start/end.
+        // Actually, for Chinese context, boundaries are different. "ABC是" -> ABC is surrounded by space? No.
+        // "ABC" is followed by Chinese char. \b matches between C and Chinese char?
+        // \w is [A-Za-z0-9_]. Chinese is non-word in JS regex unless using unicode flags?
+        // In standard JS Regex, Chinese chars are considered "non-word" boundary for \b ??
+        // Let's verify: /\bABC\b/.test("ABC是") -> true (because '是' is non-word).
+        // So \b should work for English words in Chinese text.
+
+        // Determine boundaries based on whether word starts/ends with word characters
+        // This handles "A.M." correctly (no end boundary needed if ending in non-word char)
+        const startBoundary = /^\w/.test(spelling) ? '\\b' : '';
+        const endBoundary = /\w$/.test(spelling) ? '\\b' : '';
+
+        const regex = new RegExp(`${startBoundary}${escapedSpelling}${endBoundary}`, 'gi');
+        return meaning.replace(regex, '____');
+    } catch (e) {
+        return meaning;
+    }
+}
+
 // Helper to generate questions with options
 async function generateQuestions(words: any[], activeWordBookId: number) {
     return await Promise.all(words.map(async (word) => {
-        const distractors = await prisma.$queryRaw<Array<{ meaning: String }>>`
-            SELECT meaning FROM "Word" 
+        // Fetch distractors with spelling to allow sanitization
+        const distractors = await prisma.$queryRaw<Array<{ meaning: String, spelling: String }>>`
+            SELECT meaning, spelling FROM "Word" 
             WHERE id != ${word.id} AND wordBookId = ${activeWordBookId}
             ORDER BY RANDOM() 
             LIMIT 3
         `;
 
         const options = [
-            { label: 'Correct', value: word.meaning, isCorrect: true },
-            ...distractors.map(d => ({ label: 'Option', value: d.meaning, isCorrect: false }))
+            {
+                label: 'Correct',
+                value: sanitizeMeaning(word.meaning, word.spelling),
+                isCorrect: true
+            },
+            ...distractors.map(d => ({
+                label: 'Option',
+                value: sanitizeMeaning(d.meaning as string, d.spelling as string),
+                isCorrect: false
+            }))
         ];
 
         // Shuffle options and return
         const shuffledOptions = options.sort(() => Math.random() - 0.5);
         return {
-            word: {
-                id: word.id,
-                spelling: word.spelling,
-                orderIndex: word.orderIndex,
-                phonetic: word.phonetic,
-                grammar: word.grammar,
-                example: word.example
-            },
+            word: formatWordForTask(word),
             options: shuffledOptions.map(o => ({ meaning: o.value, isCorrect: o.isCorrect }))
         };
     }));

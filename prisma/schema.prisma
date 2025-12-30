@@ -27,6 +27,16 @@ model Word {
   phonetic    String?
   grammar     String?
   example     String?
+  content     String? // Rich text content (Markdown)
+  
+  // New structured fields
+  roots       String? // 词根分析
+  affixes     String? // 词缀分析
+  history     String? // 发展历史和文化背景
+  variations  String? // 单词变形
+  mnemonic    String? // 记忆辅助
+  story       String? // 小故事
+
   orderIndex  Int
   
   wordBookId  Int?

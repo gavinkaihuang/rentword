@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { cookies } from 'next/headers';
+import { formatWordForTask } from '@/lib/word-utils';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -7,24 +9,33 @@ export async function GET(request: Request) {
     const toWord = searchParams.get('to');
     const limit = parseInt(searchParams.get('limit') || '10');
 
+    const cookieStore = await cookies();
+    const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
+
     if (!fromWord || !toWord) {
         return NextResponse.json({ error: 'Missing from/to parameters' }, { status: 400 });
     }
 
     try {
-        // 1. Find indices
+        // 1. Find indices within the active book
         const startWordObj = await prisma.word.findFirst({
-            where: { spelling: fromWord },
+            where: {
+                spelling: fromWord,
+                wordBookId: activeWordBookId
+            },
             select: { orderIndex: true },
         });
 
         const endWordObj = await prisma.word.findFirst({
-            where: { spelling: toWord },
+            where: {
+                spelling: toWord,
+                wordBookId: activeWordBookId
+            },
             select: { orderIndex: true },
         });
 
         if (!startWordObj || !endWordObj) {
-            return NextResponse.json({ error: 'Start or End word not found' }, { status: 404 });
+            return NextResponse.json({ error: 'Start or End word not found in this book' }, { status: 404 });
         }
 
         const startIdx = Math.min(startWordObj.orderIndex, endWordObj.orderIndex);
@@ -33,6 +44,7 @@ export async function GET(request: Request) {
         // 2. Fetch words in range
         const words = await prisma.word.findMany({
             where: {
+                wordBookId: activeWordBookId, // Filter by book
                 orderIndex: {
                     gte: startIdx,
                     lte: endIdx,
@@ -70,11 +82,7 @@ export async function GET(request: Request) {
             // Map to A, B, C, D locally in frontend logic, but backend provides the array.
 
             return {
-                word: {
-                    id: word.id,
-                    spelling: word.spelling,
-                    orderIndex: word.orderIndex
-                },
+                word: formatWordForTask(word),
                 options: shuffledOptions.map(o => ({ meaning: o.value, isCorrect: o.isCorrect }))
             };
         }));

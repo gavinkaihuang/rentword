@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { cookies } from 'next/headers';
+import { formatWordForTask } from '@/lib/word-utils';
 
 export async function GET(request: Request) {
     try {
@@ -36,12 +38,15 @@ export async function GET(request: Request) {
 
         const wordIds = logs.map(log => log.wordId);
 
-        // 2. Fetch word details
+        const cookieStore = await cookies();
+        const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
+
         const words = await prisma.word.findMany({
             where: {
                 id: {
                     in: wordIds
-                }
+                },
+                wordBookId: activeWordBookId // Filter by book
             }
         });
 
@@ -62,14 +67,7 @@ export async function GET(request: Request) {
             const shuffledOptions = options.sort(() => Math.random() - 0.5);
 
             return {
-                word: {
-                    id: word.id,
-                    spelling: word.spelling,
-                    orderIndex: (word as any).orderIndex, // Type assertion if needed, though prisma types should handle it
-                    phonetic: (word as any).phonetic,
-                    grammar: (word as any).grammar,
-                    example: (word as any).example
-                },
+                word: formatWordForTask(word),
                 options: shuffledOptions.map(o => ({ meaning: o.value, isCorrect: o.isCorrect }))
             };
         }));
