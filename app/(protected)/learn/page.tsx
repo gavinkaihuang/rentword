@@ -25,6 +25,7 @@ interface Question {
         story?: string;
         wordBookId?: number;
         meaning?: string;
+        displayMode?: number;
     };
     options: Option[];
     // For reverse mode override
@@ -523,7 +524,7 @@ function QuizContent() {
                                         isLearned ? 'border-[#34548a] opacity-90' : 'border-[#cfc9c2] hover:shadow-md'
                                         }`}
                                 >
-                                    <div className={`flex-grow grid grid-cols-1 ${q.word.wordBookId === 3 ? 'grid-cols-1' : 'md:grid-cols-2'} gap-4 items-center`}>
+                                    <div className={`flex-grow grid grid-cols-1 ${q.word.displayMode === 2 ? 'grid-cols-1' : 'md:grid-cols-2'} gap-4 items-center`}>
                                         <div className="flex flex-col">
                                             <div className="flex items-center w-full">
                                                 <span className="text-[#9aa5ce] font-mono mr-4 w-14 text-right text-lg shrink-0">#{q.word.orderIndex || idx + 1}</span>
@@ -576,7 +577,7 @@ function QuizContent() {
                                             </div>
 
                                             {/* Meaning for Rich Content Mode (Book ID 3) - Moved here for full width layout */}
-                                            {q.word.wordBookId === 3 && (
+                                            {q.word.displayMode === 2 && (
                                                 <div className={`mt-6 px-5 py-4 border-l-4 border-[#8c4351] bg-[#fffcfb] rounded-r-lg shadow-sm ${hideMeaning && !isMastered && !isLearned ? 'blur-md select-none' : ''}`}>
                                                     <span className="block text-xs font-bold text-[#94a3b8] mb-1 uppercase tracking-wider">Meaning (基本释义)</span>
                                                     <div className="text-[#334155] text-xl font-medium leading-relaxed">
@@ -593,7 +594,7 @@ function QuizContent() {
                                             {(!hideMeaning || isMastered || isLearned) && (
                                                 <>
                                                     {/* NEW STYLE for GPT-8000 (ID 3) */}
-                                                    {q.word.wordBookId === 3 ? (
+                                                    {q.word.displayMode === 2 ? (
                                                         <div className="mt-8 ml-0 space-y-8">
 
                                                             {/* Section B: Etymology & Depth */}
@@ -738,7 +739,7 @@ function QuizContent() {
                                         </div>
                                         <div className={`text-[#565f89] ${hideMeaning && !isMastered && !isLearned ? 'blur-md select-none' : ''}`}>
                                             {/* Fix: Use FormattedMeaning for simple view as well */}
-                                            {q.word.wordBookId !== 3 && (
+                                            {q.word.displayMode !== 2 && (
                                                 <FormattedMeaning
                                                     text={correctOption?.meaning || ''}
                                                     spelling={q.word.spelling}

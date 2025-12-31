@@ -50,6 +50,10 @@ model WordBook {
   id        Int      @id @default(autoincrement())
   name      String
   createdAt DateTime @default(now())
+  
+  // Configuration
+  displayMode Int    @default(1) // 1: Standard (Light), 2: Enhanced (Rich)
+
   words     Word[]
 }
 

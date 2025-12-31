@@ -17,6 +17,13 @@ export async function POST(request: Request) {
         const cookieStore = await cookies();
         const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
 
+
+        // Fetch active WordBook details for displayMode
+        const activeWordBook = await prisma.wordBook.findUnique({
+            where: { id: activeWordBookId }
+        });
+        const displayMode = activeWordBook?.displayMode || 1;
+
         if (!mode) {
             return NextResponse.json({ error: 'Missing mode' }, { status: 400 });
         }
@@ -60,7 +67,7 @@ export async function POST(request: Request) {
                 take: limitNum
             });
 
-            questions = await generateQuestions(words, activeWordBookId);
+            questions = await generateQuestions(words, activeWordBookId, displayMode);
 
         } else if (mode === '4') { // Daily Review
             const { date } = params;
@@ -83,19 +90,18 @@ export async function POST(request: Request) {
             if (logs.length > 0) {
                 const wordIds = logs.map(l => l.wordId);
                 const words = await prisma.word.findMany({ where: { id: { in: wordIds }, wordBookId: activeWordBookId } });
-                questions = await generateQuestions(words, activeWordBookId);
+                questions = await generateQuestions(words, activeWordBookId, displayMode);
             }
-        } else if (mode === '2') { // Smart Review (General - Placeholder for now)
+        } else if (mode === '2') { // Smart Review
             // TODO: Real review logic based on UserProgress
             // For now, let's just pick 20 random words to prevent crash
             description = 'Smart Review';
             const words = await prisma.word.findMany({
                 where: { wordBookId: activeWordBookId },
                 take: 20,
-                orderBy: { id: 'asc' } // Placeholder
+                orderBy: { id: 'asc' }
             });
-            // Ideally: fetch from UserProgress where nextReviewDate <= now
-            questions = await generateQuestions(words, activeWordBookId);
+            questions = await generateQuestions(words, activeWordBookId, displayMode);
 
         } else if (mode === '7') { // Smart Mistake Review
             description = 'Smart Mistake Review';
@@ -128,7 +134,6 @@ export async function POST(request: Request) {
 
             candidateIds.forEach(id => {
                 const p = progressMap.get(id);
-                // If no progress record, it's unmastered. If consecutiveCorrect is 0, it's unmastered.
                 const consecutive = p?.consecutiveCorrect || 0;
                 if (consecutive === 0) {
                     unmasteredIds.push(id);
@@ -138,57 +143,41 @@ export async function POST(request: Request) {
             });
 
             // 3. Selection Strategy
-            // Take ALL unmastered words (User requested to review all mistakes)
             const selectedIds = new Set(unmasteredIds);
-
-            // Take 20% of mastered words, but at least 5 (if available)
             const masteredCount = masteredIdsList.length;
             let takeMastered = Math.max(5, Math.ceil(masteredCount * 0.2));
-
-            // Randomize mastered list
             const shuffledMastered = masteredIdsList.sort(() => Math.random() - 0.5);
 
-            // Add the initial batch of mastered
             for (let i = 0; i < Math.min(takeMastered, masteredCount); i++) {
                 selectedIds.add(shuffledMastered[i]);
             }
 
-            // 4. Ensure Minimum Session Size (e.g. 10)
-            // If we have fewer than 10 words total, fill up with more mastered words if possible
             const MIN_SESSION_SIZE = 10;
             if (selectedIds.size < MIN_SESSION_SIZE && masteredCount > 0) {
-                // Try to add more from shuffledMastered that aren't already in selectedIds
                 for (const id of shuffledMastered) {
                     if (selectedIds.size >= MIN_SESSION_SIZE) break;
                     selectedIds.add(id);
                 }
             }
 
-            // Convert to array and shuffle final result
             const finalIds = Array.from(selectedIds).sort(() => Math.random() - 0.5);
 
-            // Fetch words
             const words = await prisma.word.findMany({
                 where: { id: { in: finalIds } }
             });
 
-            // Preserve order of finalIds is tricky with `in` clause, but generateQuestions shuffles options anyway.
-            // We want the queue to be the shuffled list.
-            // Map words back to ordered list.
             const wordMap = new Map(words.map(w => [w.id, w]));
             const orderedWords = finalIds.map(id => wordMap.get(id)).filter(w => w !== undefined);
-
-            // Filter out words that might belong to other book (though unlikely via ReviewLog if pure)
             const filteredOrderedWords = orderedWords.filter(w => w.wordBookId === activeWordBookId);
 
-            questions = await generateQuestions(filteredOrderedWords, activeWordBookId);
+            questions = await generateQuestions(filteredOrderedWords, activeWordBookId, displayMode);
 
         } else if (mode === '3') { // Random
             const limit = parseInt(params.limit) || 20;
             description = 'Random Practice';
             // Random query with Prisma + SQLite
             const words = await prisma.$queryRaw<any[]>`SELECT * FROM "Word" WHERE wordBookId = ${activeWordBookId} ORDER BY RANDOM() LIMIT ${limit}`;
-            questions = await generateQuestions(words, activeWordBookId);
+            questions = await generateQuestions(words, activeWordBookId, displayMode);
 
         } else if (mode === '5' || mode === '6') { // Select Words (or old logic)
             const ids = params.ids; // comma separated string?
@@ -200,7 +189,7 @@ export async function POST(request: Request) {
                     const words = await prisma.word.findMany({
                         where: { id: { in: idArray }, wordBookId: activeWordBookId }
                     });
-                    questions = await generateQuestions(words, activeWordBookId);
+                    questions = await generateQuestions(words, activeWordBookId, displayMode);
                 }
             }
         }
@@ -240,7 +229,6 @@ export async function GET(request: Request) {
     const dateStr = searchParams.get('date');
 
     if (!dateStr) {
-        // Return all tasks or recent? For now let's require date or return recent 20
         const tasks = await prisma.task.findMany({
             where: { userId: userId },
             orderBy: { createdAt: 'desc' },
@@ -276,22 +264,8 @@ function sanitizeMeaning(meaning: string, spelling: string) {
     if (!meaning || !spelling) return meaning;
     try {
         const escapedSpelling = escapeRegExp(spelling);
-        // Match the word with boundaries, case-insensitive
-        // We use a broader boundary check or just replace known occurrences if simple \b isn't enough for "A.M."
-        // For "A.M.", \bA\.M\.\b might fail at the end.
-        // Let's try a simpler approach: replace the literal string if it's surrounded by non-word chars or start/end.
-        // Actually, for Chinese context, boundaries are different. "ABC是" -> ABC is surrounded by space? No.
-        // "ABC" is followed by Chinese char. \b matches between C and Chinese char?
-        // \w is [A-Za-z0-9_]. Chinese is non-word in JS regex unless using unicode flags?
-        // In standard JS Regex, Chinese chars are considered "non-word" boundary for \b ??
-        // Let's verify: /\bABC\b/.test("ABC是") -> true (because '是' is non-word).
-        // So \b should work for English words in Chinese text.
-
-        // Determine boundaries based on whether word starts/ends with word characters
-        // This handles "A.M." correctly (no end boundary needed if ending in non-word char)
         const startBoundary = /^\w/.test(spelling) ? '\\b' : '';
         const endBoundary = /\w$/.test(spelling) ? '\\b' : '';
-
         const regex = new RegExp(`${startBoundary}${escapedSpelling}${endBoundary}`, 'gi');
         return meaning.replace(regex, '____');
     } catch (e) {
@@ -300,9 +274,8 @@ function sanitizeMeaning(meaning: string, spelling: string) {
 }
 
 // Helper to generate questions with options
-async function generateQuestions(words: any[], activeWordBookId: number) {
+async function generateQuestions(words: any[], activeWordBookId: number, displayMode: number = 1) {
     return await Promise.all(words.map(async (word) => {
-        // Fetch distractors with spelling to allow sanitization
         const distractors = await prisma.$queryRaw<Array<{ meaning: String, spelling: String }>>`
             SELECT meaning, spelling FROM "Word" 
             WHERE id != ${word.id} AND wordBookId = ${activeWordBookId}
@@ -323,10 +296,9 @@ async function generateQuestions(words: any[], activeWordBookId: number) {
             }))
         ];
 
-        // Shuffle options and return
         const shuffledOptions = options.sort(() => Math.random() - 0.5);
         return {
-            word: formatWordForTask(word),
+            word: formatWordForTask(word, displayMode),
             options: shuffledOptions.map(o => ({ meaning: o.value, isCorrect: o.isCorrect }))
         };
     }));
