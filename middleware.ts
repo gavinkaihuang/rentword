@@ -20,7 +20,8 @@ const PROTECTED_API_PREFIXES = [
     '/api/wordbooks',
     '/api/admin',
     '/api/calendar',
-    '/api/words'
+    '/api/words',
+    '/api/log-time'
 ];
 
 export async function middleware(request: NextRequest) {

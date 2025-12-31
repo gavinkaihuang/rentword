@@ -22,7 +22,7 @@ export default async function ProtectedLayout({
     return (
         <div className="relative min-h-screen">
             {/* Global User Badge */}
-            <div className="absolute top-4 left-4 z-50 bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1.5 flex items-center gap-2 shadow-lg">
+            <div className="absolute z-50 bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1.5 flex items-center gap-2 shadow-lg left-4 bottom-4 md:top-4 md:bottom-auto">
                 <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
                 <span className="text-xs font-medium text-[#343b58] font-mono">
                     {payload.username as string}

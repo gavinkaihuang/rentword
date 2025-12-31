@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { formatWordForTask } from '@/lib/word-utils';
@@ -173,11 +174,180 @@ export async function POST(request: Request) {
             questions = await generateQuestions(filteredOrderedWords, activeWordBookId, displayMode);
 
         } else if (mode === '3') { // Random
-            const limit = parseInt(params.limit) || 20;
+            // 1. Configuration
+            const TOTAL_COUNT = 50;
+            const OLD_WORDS_TARGET = 25;
+            // Allow override via params for testing, but default to 50
+            const limit = params.limit ? parseInt(params.limit) : TOTAL_COUNT;
+
             description = 'Random Practice';
-            // Random query with Prisma + SQLite
-            const words = await prisma.$queryRaw<any[]>`SELECT * FROM "Word" WHERE wordBookId = ${activeWordBookId} ORDER BY RANDOM() LIMIT ${limit}`;
-            questions = await generateQuestions(words, activeWordBookId, displayMode);
+
+            // 2. Fetch History (Last 7 Sessions)
+            // We consider 'Task' creation as a session.
+            const lastTasks = await prisma.task.findMany({
+                where: { userId: userId },
+                orderBy: { createdAt: 'desc' },
+                take: 7
+            });
+
+            // 3. Extract Candidate Old Word IDs
+            const seenWordIds = new Set<number>();
+            for (const t of lastTasks) {
+                try {
+                    const content = JSON.parse(t.content);
+                    if (Array.isArray(content)) {
+                        content.forEach((q: any) => {
+                            // Assuming content structure matches generateQuestions output: { word: { id, ... }, ... }
+                            if (q.word && q.word.id) seenWordIds.add(q.word.id);
+                        });
+                    }
+                } catch (e) {
+                    // Ignore parsing errors for old/bad data
+                }
+            }
+
+            const candidateOldIds = Array.from(seenWordIds);
+
+            // 4. Select Old Words
+            let selectedOldIds: number[] = [];
+
+            if (candidateOldIds.length > 0) {
+                // Fetch progress to determine weights
+                const progressList = await prisma.userProgress.findMany({
+                    where: {
+                        userId: userId,
+                        wordId: { in: candidateOldIds }
+                    }
+                });
+
+                const progressMap = new Map();
+                progressList.forEach(p => progressMap.set(p.wordId, p));
+
+                // Categorize
+                const errorIds: number[] = [];
+                const unfamiliarIds: number[] = [];
+                const correctIds: number[] = [];
+
+                candidateOldIds.forEach(id => {
+                    const p = progressMap.get(id);
+                    if (!p) {
+                        // If no progress record, treat as "Correct" or neutral? 
+                        // Maybe "Unfamiliar" to be safe, or just "Correct" if we assume they learned it?
+                        // Let's treat as Correct (neutral) for now, or maybe Unfamiliar if we want to reinforce.
+                        // Given the prompt "Mistake > Unfamiliar > Correct", neutral is lowest.
+                        correctIds.push(id);
+                    } else {
+                        if (p.consecutiveCorrect === 0) { // Assuming 0 means last was wrong or new
+                            errorIds.push(id);
+                        } else if (p.isUnfamiliar) {
+                            unfamiliarIds.push(id);
+                        } else {
+                            correctIds.push(id);
+                        }
+                    }
+                });
+
+                const oldTarget = Math.min(candidateOldIds.length, OLD_WORDS_TARGET);
+
+                if (candidateOldIds.length <= OLD_WORDS_TARGET) {
+                    // Take all
+                    selectedOldIds = candidateOldIds;
+                } else {
+                    // Weighted Random Selection
+                    // Strategy: Assign slots? Or just probability?
+                    // Prompt: Error:Unfamiliar:Correct = High:Medium:Low (e.g. 5:3:2)
+                    // We can create a weighted pool.
+
+                    const weightedPool: number[] = [];
+                    // Weights
+                    const W_ERROR = 5;
+                    const W_UNFAMILIAR = 3;
+                    const W_CORRECT = 2;
+
+                    errorIds.forEach(id => { for (let i = 0; i < W_ERROR; i++) weightedPool.push(id); });
+                    unfamiliarIds.forEach(id => { for (let i = 0; i < W_UNFAMILIAR; i++) weightedPool.push(id); });
+                    correctIds.forEach(id => { for (let i = 0; i < W_CORRECT; i++) weightedPool.push(id); });
+
+                    const selectedSet = new Set<number>();
+
+                    // Shuffle pool
+                    const shuffledPool = weightedPool.sort(() => Math.random() - 0.5);
+
+                    for (const id of shuffledPool) {
+                        if (selectedSet.size >= oldTarget) break;
+                        selectedSet.add(id);
+                    }
+                    // Fallback if pool didn't fill (unlikely unless pool is empty, but we checked length)
+                    // If unique items in pool < oldTarget (shouldn't happen since candidateOldIds.length > oldTarget)
+
+                    // To be safe, if we still need words (due to duplicates in pool selection), fill from remaining candidates
+                    if (selectedSet.size < oldTarget) {
+                        const remaining = candidateOldIds.filter(id => !selectedSet.has(id));
+                        for (const id of remaining) {
+                            if (selectedSet.size >= oldTarget) break;
+                            selectedSet.add(id);
+                        }
+                    }
+
+                    selectedOldIds = Array.from(selectedSet);
+                }
+            }
+
+            // 5. Select New Words
+            const neededTotal = limit; // Should be 50
+            const neededNew = Math.max(0, neededTotal - selectedOldIds.length);
+            let selectedNewWords: any[] = [];
+
+            if (neededNew > 0) {
+                // Fetch random words from WordBook that are NOT in selectedOldIds
+                // Note: Prisma doesn't support "NOT IN" with random easily efficiently, 
+                // but for 8000 words, fetching IDs or using raw query is okay.
+                // We use raw query for speed and randomness.
+
+                // We need to exclude the words we already picked.
+                // AND we arguably should exclude ALL "Old" words? 
+                // Prompt: "Take 25 old... take 25 NEW". 
+                // "New" usually means "not in the old list". 
+                // If I exclude all `seenWordIds`, I might run out of words if user learned a lot.
+                // But generally "new" means "from the book", excluding the ones we just picked as "old".
+
+                if (selectedOldIds.length > 0) {
+                    const oldIdsList = selectedOldIds.join(',');
+                    selectedNewWords = await prisma.$queryRaw<any[]>`
+                        SELECT * FROM "Word" 
+                        WHERE wordBookId = ${activeWordBookId} 
+                        AND id NOT IN (${Prisma.join(selectedOldIds)})
+                        ORDER BY RANDOM() 
+                        LIMIT ${neededNew}
+                    `;
+                } else {
+                    selectedNewWords = await prisma.$queryRaw<any[]>`
+                        SELECT * FROM "Word" 
+                        WHERE wordBookId = ${activeWordBookId} 
+                        ORDER BY RANDOM() 
+                        LIMIT ${neededNew}
+                    `;
+                }
+            }
+
+            // 6. Combine
+            let finalWords: any[] = [];
+
+            // Fetch objects for old words
+            if (selectedOldIds.length > 0) {
+                const oldWords = await prisma.word.findMany({
+                    where: { id: { in: selectedOldIds } }
+                });
+                finalWords = [...oldWords];
+            }
+
+            finalWords = [...finalWords, ...selectedNewWords];
+
+            // Shuffle final result
+            finalWords = finalWords.sort(() => Math.random() - 0.5);
+
+            questions = await generateQuestions(finalWords, activeWordBookId, displayMode);
+
 
         } else if (mode === '5' || mode === '6') { // Select Words (or old logic)
             const ids = params.ids; // comma separated string?
