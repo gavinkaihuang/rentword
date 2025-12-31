@@ -33,7 +33,7 @@ export default function CalendarPage() {
     const [selectedDate, setSelectedDate] = useState<string | null>(today.toISOString().split('T')[0]);
 
     // Details State
-    const [dayDetails, setDayDetails] = useState<{ word: { id: number; spelling: string; meaning: string }; attempts: number; correct: number; mistakeStatus: 'resolved' | 'unresolved' | null }[]>([]);
+    const [dayDetails, setDayDetails] = useState<{ word: { id: number; spelling: string; meaning: string }; attempts: number; correct: number; mistakeStatus: 'resolved' | 'unresolved' | null; isUnfamiliar?: boolean }[]>([]);
     const [loadingDetails, setLoadingDetails] = useState(false);
 
     useEffect(() => {
@@ -153,6 +153,36 @@ export default function CalendarPage() {
         return calendarDays;
     };
 
+    const toggleUnfamiliar = async (e: React.MouseEvent, wordId: number) => {
+        e.stopPropagation();
+
+        // Find current status
+        const wordIndex = dayDetails.findIndex(w => w.word.id === wordId);
+        if (wordIndex === -1) return;
+
+        const currentStatus = dayDetails[wordIndex].isUnfamiliar || false;
+
+        // Optimistic update
+        const newDetails = [...dayDetails];
+        newDetails[wordIndex] = { ...newDetails[wordIndex], isUnfamiliar: !currentStatus };
+        setDayDetails(newDetails);
+
+        try {
+            const res = await fetch('/api/words', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ wordId, isUnfamiliar: !currentStatus })
+            });
+            if (!res.ok) throw new Error('Failed to update');
+        } catch (err) {
+            console.error(err);
+            // Revert
+            const revertDetails = [...dayDetails];
+            revertDetails[wordIndex] = { ...revertDetails[wordIndex], isUnfamiliar: currentStatus };
+            setDayDetails(revertDetails);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[#e1e2e7] flex flex-col p-4 md:p-8">
             <div className="max-w-6xl w-full mx-auto">
@@ -236,7 +266,7 @@ export default function CalendarPage() {
                                                     <div className="flex items-center gap-2">
                                                         <h3 className="font-bold text-base text-[#343b58]">{item.word.spelling}</h3>
                                                     </div>
-                                                    <div className="flex gap-1 mt-1">
+                                                    <div className="flex gap-1 mt-1 items-center">
                                                         {item.mistakeStatus === 'unresolved' && (
                                                             <span className="text-[10px] bg-[#f4dbd6] text-[#8c4351] px-1.5 py-0.5 rounded-full font-bold">
                                                                 Mistake
@@ -247,6 +277,18 @@ export default function CalendarPage() {
                                                                 Resolved
                                                             </span>
                                                         )}
+                                                        {/* Interactive Unfamiliar Toggle */}
+                                                        <button
+                                                            onClick={(e) => toggleUnfamiliar(e, item.word.id)}
+                                                            className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold transition-colors flex items-center gap-0.5 ${item.isUnfamiliar
+                                                                ? 'bg-[#fff2cd] text-[#b45309] hover:bg-[#ffebb0]'
+                                                                : 'bg-[#e1e2e7] text-[#9aa5ce] hover:text-[#b45309] hover:bg-[#fff2cd]'
+                                                                }`}
+                                                            title={item.isUnfamiliar ? "Marked as unfamiliar" : "Mark as unfamiliar"}
+                                                        >
+                                                            <span>{item.isUnfamiliar ? '★' : '☆'}</span>
+                                                            <span>Unfamiliar</span>
+                                                        </button>
                                                     </div>
                                                 </div>
                                                 <div className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#e1e2e7] text-[#565f89] whitespace-nowrap">

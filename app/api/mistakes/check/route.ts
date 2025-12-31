@@ -10,44 +10,54 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
         }
 
-        // 1. Identify words with ANY error history
-        const mistakes = await prisma.reviewLog.findMany({
+        const userIdHeader = request.headers.get('x-user-id');
+        const userId = userIdHeader ? parseInt(userIdHeader) : 0;
+
+        // Fetch progress for ALL requested words to determine unfamiliar status
+        const allProgress = await prisma.userProgress.findMany({
             where: {
                 wordId: { in: wordIds },
-                isCorrect: false
+                userId: userId
+            }
+        });
+
+        const progressMap = new Map();
+        allProgress.forEach(p => progressMap.set(p.wordId, p));
+
+        const unfamiliarStatus: Record<number, boolean> = {};
+        const mistakeStatus: Record<number, 'resolved' | 'unresolved'> = {};
+
+        // Identify actual mistakes from logs to distinction 'resolved' vs 'unresolved'
+        // If it's not in error history, it's neither.
+        const errorHistory = await prisma.reviewLog.findMany({
+            where: {
+                wordId: { in: wordIds },
+                isCorrect: false,
+                userId: userId
             },
             select: { wordId: true },
             distinct: ['wordId']
         });
+        const errorWordIds = new Set(errorHistory.map(e => e.wordId));
 
-        if (mistakes.length === 0) {
-            return NextResponse.json({ mistakeStatus: {} });
-        }
-
-        const paramIds = mistakes.map(m => m.wordId);
-
-        // 2. Check their current status (Resolved vs Unresolved)
-        const progressList = await prisma.userProgress.findMany({
-            where: { wordId: { in: paramIds } }
-        });
-
-        const progressMap = new Map();
-        progressList.forEach(p => progressMap.set(p.wordId, p));
-
-        const mistakeStatus: Record<number, 'resolved' | 'unresolved'> = {};
-
-        paramIds.forEach(id => {
+        wordIds.forEach((id: number) => {
             const p = progressMap.get(id);
-            // If it has error history (which it does), check consecutiveCorrect
-            const consecutive = p?.consecutiveCorrect || 0;
-            if (consecutive > 0) {
-                mistakeStatus[id] = 'resolved';
-            } else {
-                mistakeStatus[id] = 'unresolved';
+
+            // 1. Unfamiliar Status (Independent of mistakes)
+            unfamiliarStatus[id] = p?.isUnfamiliar || false;
+
+            // 2. Mistake Status
+            if (errorWordIds.has(id)) {
+                const consecutive = p?.consecutiveCorrect || 0;
+                if (consecutive > 0) {
+                    mistakeStatus[id] = 'resolved';
+                } else {
+                    mistakeStatus[id] = 'unresolved';
+                }
             }
         });
 
-        return NextResponse.json({ mistakeStatus });
+        return NextResponse.json({ mistakeStatus, unfamiliarStatus });
     } catch (error) {
         console.error('Error checking mistakes:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

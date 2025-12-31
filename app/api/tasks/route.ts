@@ -192,6 +192,37 @@ export async function POST(request: Request) {
                     questions = await generateQuestions(words, activeWordBookId, displayMode);
                 }
             }
+
+        } else if (mode === '8') { // Unfamiliar Words
+            description = 'Unfamiliar Words';
+
+            // 1. Find all unfamiliar words for this user
+            const unfamiliarProgress = await prisma.userProgress.findMany({
+                where: {
+                    userId: userId,
+                    isUnfamiliar: true
+                },
+                select: { wordId: true }
+            });
+
+            if (unfamiliarProgress.length === 0) {
+                return NextResponse.json({ error: 'No unfamiliar words found!', questions: [] });
+            }
+
+            const wordIds = unfamiliarProgress.map(p => p.wordId);
+
+            // 2. Fetch words
+            const words = await prisma.word.findMany({
+                where: {
+                    id: { in: wordIds },
+                    wordBookId: activeWordBookId
+                },
+                orderBy: { spelling: 'asc' } // Or timestamp if available? Spelling is fine.
+            });
+
+            // 3. Generate questions (shuffle words first)
+            const shuffledWords = words.sort(() => Math.random() - 0.5);
+            questions = await generateQuestions(shuffledWords, activeWordBookId, displayMode);
         }
 
         if (questions.length === 0) {

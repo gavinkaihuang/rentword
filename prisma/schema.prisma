@@ -65,6 +65,7 @@ model UserProgress {
   nextReviewDate     DateTime?
   lastReviewed       DateTime?
   consecutiveCorrect Int       @default(0)
+  isUnfamiliar       Boolean   @default(false)
   
   userId             Int       // Required now
   user               User      @relation(fields: [userId], references: [id])

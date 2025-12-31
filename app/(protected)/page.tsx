@@ -250,6 +250,18 @@ export default function Home() {
           </button>
         </div>
 
+        {/* Unfamiliar Words (New Mode 8) */}
+        <div className="bg-[#d5d6db] p-6 rounded-xl shadow-lg border border-[#c0caf5] flex flex-col">
+          <h2 className="text-2xl font-semibold mb-4 text-[#343b58]">Unfamiliar Words</h2>
+          <p className="text-[#565f89] mb-6 flex-grow">Focus on words you have marked as unfamiliar.</p>
+          <button
+            onClick={() => router.push('/learn?mode=8')}
+            className="w-full bg-[#c0a36e] hover:bg-[#a68b5b] text-white font-bold py-3 rounded-lg mt-auto transition"
+          >
+            Start Learning
+          </button>
+        </div>
+
         {/* Recitation Calendar Link */}
         <div className="md:col-span-3 bg-[#d5d6db] p-6 rounded-xl shadow-lg border border-[#c0caf5] flex items-center justify-between hover:bg-[#c9cdd8] transition cursor-pointer" onClick={() => router.push('/calendar')}>
           <div>

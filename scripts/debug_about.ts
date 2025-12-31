@@ -4,33 +4,34 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-    // Find 'about' in GPT-8000 Words (Book ID 3)
-    const word = await prisma.word.findFirst({
-        where: {
-            spelling: 'about',
-            wordBookId: 3
+    const matchingWords = await prisma.word.findMany({
+        where: { id: 7 },
+        include: {
+            userProgress: true,
+            reviewLogs: true
         }
     });
 
-    if (!word) {
-        console.log("Word 'about' not found in Book 3.");
-        return;
-    }
+    console.log(`Found ${matchingWords.length} words containing 'bout':`);
+    matchingWords.forEach(w => {
+        console.log(`ID: ${w.id}, Spelling: "${w.spelling}"`);
+        console.log(` - Progress:`, JSON.stringify(w.userProgress, null, 2));
+    });
 
-    console.log("Found Word:", word.spelling);
-    console.log("--------------------------------");
-    console.log("Raw Content Length:", word.content?.length);
-    console.log("Roots:", word.roots);
-    console.log("Affixes:", word.affixes);
-    console.log("History:", word.history);
-    console.log("Variations:", word.variations);
-    console.log("Mnemonic:", word.mnemonic);
-    console.log("Story:", word.story);
-    console.log("--------------------------------");
-    console.log("RAW CONTENT START:");
-    console.log(word.content?.substring(0, 500)); // Show first 500 chars to check format
+    // Check recent logs
+    const logs = await prisma.reviewLog.findMany({
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+        include: { word: true }
+    });
+    console.log('\nRecent 10 logs:');
+    logs.forEach(l => {
+        console.log(`Log ID: ${l.id}, Word: "${l.word.spelling}" (ID: ${l.wordId}), User: ${l.userId}`);
+    });
 }
 
 main()
-    .catch(console.error)
-    .finally(() => prisma.$disconnect());
+    .catch(e => console.error(e))
+    .finally(async () => {
+        await prisma.$disconnect();
+    });

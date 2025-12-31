@@ -82,6 +82,18 @@ export async function GET(request: Request) {
         // Check for mistakes (Mistake Book Status)
         // Check for mistakes (Mistake Book Status)
         const wordIds = Array.from(uniqueWords.keys());
+
+        // Fetch progress for ALL words to get 'isUnfamiliar' (and mistake status)
+        const progressList = await prisma.userProgress.findMany({
+            where: {
+                wordId: { in: wordIds },
+                userId // Filter by user
+            }
+        });
+        const progressMap = new Map();
+        progressList.forEach(p => progressMap.set(p.wordId, p));
+
+        // Get mistake logs to identify if it WAS a mistake
         const mistakeLogs = await prisma.reviewLog.findMany({
             where: {
                 wordId: { in: wordIds },
@@ -92,33 +104,26 @@ export async function GET(request: Request) {
             distinct: ['wordId']
         });
 
-        const mistakeIds = mistakeLogs.map(l => l.wordId);
-
-        // Fetch their progress
-        const progressList = await prisma.userProgress.findMany({
-            where: {
-                wordId: { in: mistakeIds },
-                userId // Filter by user
-            }
-        });
-        const progressMap = new Map();
-        progressList.forEach(p => progressMap.set(p.wordId, p));
+        const mistakeIds = new Set(mistakeLogs.map(l => l.wordId));
 
         const result = Array.from(uniqueWords.values()).map((entry: any) => {
             const id = entry.word.id;
             let mistakeStatus: 'resolved' | 'unresolved' | null = null;
+            const progress = progressMap.get(id);
+            const isUnfamiliar = progress?.isUnfamiliar || false;
 
-            if (mistakeIds.includes(id)) {
-                const p = progressMap.get(id);
-                const consecutive = p?.consecutiveCorrect || 0;
+            if (mistakeIds.has(id)) {
+                const consecutive = progress?.consecutiveCorrect || 0;
                 mistakeStatus = consecutive > 0 ? 'resolved' : 'unresolved';
             }
 
             return {
                 ...entry,
-                mistakeStatus
+                mistakeStatus,
+                isUnfamiliar
             };
         });
+
 
         return NextResponse.json({ date: dateStr, words: result, timeStats });
     } catch (error) {

@@ -102,6 +102,7 @@ function QuizContent() {
     const [view, setView] = useState<'preview' | 'quiz'>('preview');
     const [learnedWords, setLearnedWords] = useState<Set<number>>(new Set());
     const [mistakeStatusMap, setMistakeStatusMap] = useState<Record<number, 'resolved' | 'unresolved'>>({});
+    const [unfamiliarStatusMap, setUnfamiliarStatusMap] = useState<Record<number, boolean>>({});
 
     const [currentTaskId, setCurrentTaskId] = useState<number | null>(null);
     const [hideSpelling, setHideSpelling] = useState(false);
@@ -147,8 +148,32 @@ function QuizContent() {
             if (data.mistakeStatus) {
                 setMistakeStatusMap(data.mistakeStatus);
             }
+            if (data.unfamiliarStatus) {
+                setUnfamiliarStatusMap(data.unfamiliarStatus);
+            }
         } catch (e) {
             console.error('Failed to check mistakes', e);
+        }
+    };
+
+    const toggleUnfamiliar = async (e: React.MouseEvent, wordId: number) => {
+        e.stopPropagation();
+        const currentStatus = unfamiliarStatusMap[wordId] || false;
+
+        // Optimistic update
+        setUnfamiliarStatusMap(prev => ({ ...prev, [wordId]: !currentStatus }));
+
+        try {
+            const res = await fetch('/api/words', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ wordId, isUnfamiliar: !currentStatus })
+            });
+            if (!res.ok) throw new Error('Failed to update');
+        } catch (err) {
+            console.error(err);
+            // Revert on error
+            setUnfamiliarStatusMap(prev => ({ ...prev, [wordId]: currentStatus }));
         }
     };
 
@@ -565,15 +590,27 @@ function QuizContent() {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); toggleLearned(q.word.id); }}
-                                                    className={`ml-auto shrink-0 px-4 py-2 rounded-lg text-sm font-bold border transition-colors shadow-sm ${isLearned
-                                                        ? 'bg-[#eef1f8] text-[#34548a] border-[#34548a] hover:bg-[#d0d8e8]'
-                                                        : 'bg-white text-[#565f89] border-[#cfc9c2] hover:border-[#343b58] hover:text-[#343b58] hover:bg-[#f1f5f9]'
-                                                        }`}
-                                                >
-                                                    {isLearned ? '✓ Known' : 'Mark Known'}
-                                                </button>
+                                                <div className="flex flex-col gap-2 items-end ml-auto shrink-0">
+                                                    <button
+                                                        onClick={(e) => toggleLearned(q.word.id)}
+                                                        className={`px-4 py-2 rounded-lg text-sm font-bold border transition-colors shadow-sm ${isLearned
+                                                            ? 'bg-[#eef1f8] text-[#34548a] border-[#34548a] hover:bg-[#d0d8e8]'
+                                                            : 'bg-white text-[#565f89] border-[#cfc9c2] hover:border-[#343b58] hover:text-[#343b58] hover:bg-[#f1f5f9]'
+                                                            }`}
+                                                    >
+                                                        {isLearned ? '✓ Known' : 'Mark Known'}
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => toggleUnfamiliar(e, q.word.id)}
+                                                        className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${unfamiliarStatusMap[q.word.id]
+                                                            ? 'bg-[#fff2cd] text-[#b45309] hover:bg-[#ffebb0]'
+                                                            : 'bg-transparent text-[#9aa5ce] hover:text-[#b45309] hover:bg-[#fff2cd]'
+                                                            }`}
+                                                        title={unfamiliarStatusMap[q.word.id] ? "Marked as unfamiliar" : "Mark as unfamiliar"}
+                                                    >
+                                                        {unfamiliarStatusMap[q.word.id] ? '★ Unfamiliar' : '☆ Unfamiliar'}
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             {/* Meaning for Rich Content Mode (Book ID 3) - Moved here for full width layout */}
@@ -752,6 +789,27 @@ function QuizContent() {
                             );
                         })}
                     </div>
+
+                    <div className="flex justify-center mt-6 pb-20">
+                        {remainingCount > 0 ? (
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={startQuiz}
+                                    className="bg-[#34548a] hover:bg-[#2a4470] text-white px-8 py-3 rounded-lg font-bold shadow-lg transition transform hover:scale-105 text-lg"
+                                >
+                                    Start Quiz ({remainingCount} left) →
+                                </button>
+                                <button
+                                    onClick={startRecitation}
+                                    className="bg-[#5a4a78] hover:bg-[#483b60] text-white px-8 py-3 rounded-lg font-bold shadow-lg transition transform hover:scale-105 text-lg"
+                                >
+                                    Start Recitation 🧠
+                                </button>
+                            </div>
+                        ) : (
+                            <span className="text-[#33635c] font-bold text-lg">All Mastered!</span>
+                        )}
+                    </div>
                 </div>
             </div>
         );
@@ -765,11 +823,27 @@ function QuizContent() {
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-[#e1e2e7] p-4">
-            <div className="bg-[#f2f3f5] p-8 rounded-2xl shadow-xl w-full max-w-2xl border border-[#c0caf5]">
-                <div className="flex justify-between text-sm text-[#9aa5ce] mb-4">
-                    <span>Active Queue: {queue.length}</span>
-                    <span>Mastered: {masteredIds.size} / {totalCount}</span>
+            <div className="bg-[#f2f3f5] p-8 rounded-2xl shadow-xl w-full max-w-2xl border border-[#c0caf5] relative">
+                <div className="flex justify-between items-center text-sm text-[#9aa5ce] mb-4 min-h-[32px]">
+                    <div className="flex gap-4">
+                        <span>Active Queue: {queue.length}</span>
+                        <span>Mastered: {masteredIds.size} / {totalCount}</span>
+                    </div>
+
+                    {/* Unfamiliar Toggle */}
+                    <button
+                        onClick={(e) => toggleUnfamiliar(e, currentQ.word.id)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${unfamiliarStatusMap[currentQ.word.id]
+                            ? 'bg-[#fff2cd] text-[#b45309] hover:bg-[#ffebb0]'
+                            : 'bg-white/50 text-[#9aa5ce] hover:text-[#b45309] hover:bg-[#fff2cd] border border-transparent hover:border-[#b45309]/20'
+                            }`}
+                        title={unfamiliarStatusMap[currentQ.word.id] ? "Marked as unfamiliar" : "Mark as unfamiliar"}
+                    >
+                        <span className="text-lg leading-none pb-0.5">{unfamiliarStatusMap[currentQ.word.id] ? '★' : '☆'}</span>
+                        <span>Unfamiliar</span>
+                    </button>
                 </div>
+
                 {/* Progress Bar */}
                 <div className="w-full bg-[#d5d6db] rounded-full h-2 mb-8">
                     <div

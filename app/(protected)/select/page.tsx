@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 interface Word {
     id: number;
     spelling: string;
+    isUnfamiliar?: boolean;
 }
 
 export default function SelectWordsPage() {
@@ -57,6 +58,24 @@ export default function SelectWordsPage() {
         router.push(`/learn?mode=6&ids=${ids}`);
     };
 
+    const toggleUnfamiliar = async (e: React.MouseEvent, wordId: number, currentStatus: boolean) => {
+        e.stopPropagation();
+        // Optimistic update
+        setWords(prev => prev.map(w => w.id === wordId ? { ...w, isUnfamiliar: !currentStatus } : w));
+
+        try {
+            await fetch('/api/words', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ wordId, isUnfamiliar: !currentStatus })
+            });
+        } catch (err) {
+            console.error(err);
+            // Revert on error
+            setWords(prev => prev.map(w => w.id === wordId ? { ...w, isUnfamiliar: currentStatus } : w));
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[#e1e2e7] flex flex-col pt-4 pb-24 md:p-8 md:pb-8 relative">
             <div className="max-w-6xl w-full mx-auto px-4 md:px-0">
@@ -106,7 +125,16 @@ export default function SelectWordsPage() {
                                 >
                                     <div className="flex justify-between items-center">
                                         <span className="font-bold text-lg">{word.spelling}</span>
-                                        {isSelected && <span className="text-[#34548a]">✓</span>}
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={(e) => toggleUnfamiliar(e, word.id, !!word.isUnfamiliar)}
+                                                className={`p-1 rounded-full hover:bg-black/10 transition-colors ${word.isUnfamiliar ? 'text-[#8c4351]' : 'text-[#9aa5ce] hover:text-[#565f89]'}`}
+                                                title={word.isUnfamiliar ? "Marked as unfamiliar" : "Mark as unfamiliar"}
+                                            >
+                                                {word.isUnfamiliar ? '★' : '☆'}
+                                            </button>
+                                            {isSelected && <span className="text-[#34548a]">✓</span>}
+                                        </div>
                                     </div>
                                 </div>
                             );
