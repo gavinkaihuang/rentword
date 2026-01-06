@@ -78,7 +78,8 @@ export default function Home() {
     }
 
     try {
-      const res = await fetch(`/api/learn/validate?from=${mode1From}&to=${mode1To}`);
+      // Pass activeBookId explicitly for validation
+      const res = await fetch(`/api/learn/validate?from=${mode1From}&to=${mode1To}&wordBookId=${activeBookId}`);
       const data = await res.json();
 
       if (!res.ok) {
@@ -87,7 +88,15 @@ export default function Home() {
       }
 
       // Proceed with resolved start and end words, passing the count as limit
-      router.push(`/learn?mode=1&from=${data.startWord}&to=${data.endWord}&limit=${data.count}`);
+      const countIndex = data.count || 20;
+
+      if (countIndex > 50) {
+        const confirmed = window.confirm(`Found ${countIndex} words between "${data.startWord}" and "${data.endWord}" in the current book.\n\nThis is a large set. Do you want to proceed?`);
+        if (!confirmed) return;
+      }
+
+      // Include wordBookId in the URL to ensure the learn page uses the correct book
+      router.push(`/learn?mode=1&from=${data.startWord}&to=${data.endWord}&limit=${countIndex}&wordBookId=${activeBookId}`);
     } catch (e) {
       console.error(e);
       alert('An error occurred while validating inputs.');

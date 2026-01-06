@@ -7,9 +7,17 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const fromInput = searchParams.get('from') || '';
         const toInput = searchParams.get('to') || '';
+        const wordBookParam = searchParams.get('wordBookId');
 
         const cookieStore = await cookies();
-        const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
+        let activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
+
+        if (wordBookParam) {
+            const parsedId = parseInt(wordBookParam);
+            if (!isNaN(parsedId)) {
+                activeWordBookId = parsedId;
+            }
+        }
 
         if (!fromInput) {
             return NextResponse.json({ error: 'Missing start input' }, { status: 400 });
@@ -77,7 +85,7 @@ export async function GET(request: Request) {
                     }
                 },
                 orderBy: { orderIndex: 'asc' },
-                take: 20
+                take: 50
             });
 
             if (words.length > 0) {

@@ -16,7 +16,14 @@ export async function POST(request: Request) {
         const { mode, ...params } = body;
 
         const cookieStore = await cookies();
-        const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
+        let activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
+
+        if (params.wordBookId) {
+            const parsedId = parseInt(params.wordBookId);
+            if (!isNaN(parsedId)) {
+                activeWordBookId = parsedId;
+            }
+        }
 
 
         // Fetch active WordBook details for displayMode
@@ -39,7 +46,7 @@ export async function POST(request: Request) {
             const { from, to, limit } = params;
             let fromNum = parseInt(from);
             let toNum = parseInt(to);
-            const limitNum = parseInt(limit) || 20;
+            const limitNum = parseInt(limit) || 50;
 
             // If not numbers, try to find words by spelling
             if (isNaN(fromNum)) {
