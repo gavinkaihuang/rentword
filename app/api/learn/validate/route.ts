@@ -74,36 +74,35 @@ export async function GET(request: Request) {
             // So we need to find the spelling of the 20th word.
 
             // Find word with orderIndex = startWord.orderIndex + 19
-            // But order indices might not be contiguous if deletions happened (though unlikely here).
-            // Better: findMany with skip/take.
+            // Better: findMany with skip/take but using spelling order
 
             const words = await prisma.word.findMany({
                 where: {
                     wordBookId: activeWordBookId,
-                    orderIndex: {
-                        gte: startWord.orderIndex
+                    spelling: {
+                        gte: startWord.spelling
                     }
                 },
-                orderBy: { orderIndex: 'asc' },
-                take: 50
+                orderBy: { spelling: 'asc' },
+                take: 50 // Take enough to find the 20th, plus buffer
             });
 
             if (words.length > 0) {
-                endWord = words[words.length - 1]; // The last of the 20
+                // If we found enough words, pick the 20th (index 19), or the last one if fewer
+                const targetIndex = Math.min(words.length - 1, 19);
+                endWord = words[targetIndex];
             } else {
-                endWord = startWord; // Should not happen given startWord exists
+                endWord = startWord;
             }
         }
 
         // 4. Calculate Count
-        // Now we have startWord and endWord (either user's or default).
-        // Let's count properly.
         const count = await prisma.word.count({
             where: {
                 wordBookId: activeWordBookId,
-                orderIndex: {
-                    gte: startWord.orderIndex,
-                    lte: endWord.orderIndex
+                spelling: {
+                    gte: startWord.spelling,
+                    lte: endWord.spelling
                 }
             }
         });

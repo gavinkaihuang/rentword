@@ -44,34 +44,30 @@ export async function POST(request: Request) {
 
         if (mode === '1') { // Range
             const { from, to, limit } = params;
-            let fromNum = parseInt(from);
-            let toNum = parseInt(to);
+            // from/to are expected to be spellings now for Mode 1
+            let startSpelling = from;
+            let endSpelling = to;
             const limitNum = parseInt(limit) || 50;
 
-            // If not numbers, try to find words by spelling
-            if (isNaN(fromNum)) {
-                const startWord = await prisma.word.findFirst({ where: { spelling: from, wordBookId: activeWordBookId } });
-                if (startWord) fromNum = startWord.orderIndex;
-            }
-            if (isNaN(toNum)) {
-                const endWord = await prisma.word.findFirst({ where: { spelling: to, wordBookId: activeWordBookId } });
-                if (endWord) toNum = endWord.orderIndex;
-            }
+            // In case frontend still sends some ID or index (unlikely but safe to check), 
+            // the validation logic returns spellings, so we should be good.
+            // If they are missing, we can't proceed well without them.
 
-            description = `Range Learning: ${from}-${to}`;
+            description = `Range Learning: ${startSpelling}-${endSpelling}`;
 
-            if (isNaN(fromNum) || isNaN(toNum)) {
-                return NextResponse.json({ error: `Invalid range parameters: ${from}, ${to} could not be resolved` }, { status: 400 });
+            if (!startSpelling || !endSpelling) {
+                return NextResponse.json({ error: `Invalid range parameters` }, { status: 400 });
             }
 
             const words = await prisma.word.findMany({
                 where: {
                     wordBookId: activeWordBookId,
-                    orderIndex: {
-                        gte: fromNum,
-                        lte: toNum
+                    spelling: {
+                        gte: startSpelling,
+                        lte: endSpelling
                     }
                 },
+                orderBy: { spelling: 'asc' },
                 take: limitNum
             });
 
