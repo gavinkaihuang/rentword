@@ -18,76 +18,150 @@ export async function GET(request: Request) {
         const cookieStore = await cookies();
         const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
 
-        // 1. Find all words that have EVER had an error (Mistake Book Candidate)
-        // Filter by userId
-        const errorLogs = await prisma.reviewLog.findMany({
-            where: {
-                isCorrect: false,
-                userId: userId
-            },
-            select: { wordId: true, createdAt: true },
-            distinct: ['wordId'],
-            orderBy: { createdAt: 'desc' }
-        });
+        // 1. Determine IDs based on status
+        let finalIds: number[] = [];
 
-        const allCandidateIds = errorLogs.map(l => l.wordId);
+        if (status === 'critical') {
+            // A. Get Unfamiliar words
+            const unfamiliarProgress = await prisma.userProgress.findMany({
+                where: {
+                    userId: userId,
+                    isUnfamiliar: true
+                },
+                select: { wordId: true }
+            });
+            const unfamiliarIds = unfamiliarProgress.map(p => p.wordId);
 
-        if (allCandidateIds.length === 0) {
-            return NextResponse.json({
-                mistakes: [],
-                pagination: { page, limit, total: 0, totalPages: 0 }
+            // B. Get Mistake Candidates (History of error)
+            const errorLogs = await prisma.reviewLog.findMany({
+                where: {
+                    isCorrect: false,
+                    userId: userId
+                },
+                select: { wordId: true },
+                distinct: ['wordId']
+            });
+            const mistakeCandidateIds = errorLogs.map(l => l.wordId);
+
+            // Combine unique IDs
+            const combinedIds = Array.from(new Set([...unfamiliarIds, ...mistakeCandidateIds]));
+
+            if (combinedIds.length === 0) {
+                return NextResponse.json({
+                    mistakes: [],
+                    pagination: { page, limit, total: 0, totalPages: 0 }
+                });
+            }
+
+            // Filter by WordBook
+            const wordsInBook = await prisma.word.findMany({
+                where: {
+                    id: { in: combinedIds },
+                    wordBookId: activeWordBookId
+                },
+                select: { id: true }
+            });
+            const validIds = wordsInBook.map(w => w.id);
+
+            // Fetch progress to confirm "Unmastered Mistake" status for those who are NOT explicitly unfamiliar
+            // (If isUnfamiliar is true, we include it regardless of mistake status)
+            const progressList = await prisma.userProgress.findMany({
+                where: {
+                    wordId: { in: validIds },
+                    userId: userId
+                }
+            });
+            const progressMap = new Map();
+            progressList.forEach(p => progressMap.set(p.wordId, p));
+
+            finalIds = validIds.filter(id => {
+                const p = progressMap.get(id);
+                if (!p) return false; // Should not happen usually
+
+                if (p.isUnfamiliar) return true; // Include if Unfamiliar
+
+                // Else check if it is an unmastered mistake
+                // Must have error history (which is true if it was in mistakeCandidateIds)
+                // AND consecutiveCorrect must be 0
+                const hasErrorHistory = mistakeCandidateIds.includes(id);
+                if (hasErrorHistory && p.consecutiveCorrect === 0) return true;
+
+                return false;
+            });
+
+        } else {
+            // Existing Logic for 'unmastered' (default) and 'mastered'
+
+            // 1. Find all words that have EVER had an error
+            const errorLogs = await prisma.reviewLog.findMany({
+                where: {
+                    isCorrect: false,
+                    userId: userId
+                },
+                select: { wordId: true, createdAt: true },
+                distinct: ['wordId'],
+                orderBy: { createdAt: 'desc' }
+            });
+
+            const allCandidateIds = errorLogs.map(l => l.wordId);
+
+            if (allCandidateIds.length === 0) {
+                return NextResponse.json({
+                    mistakes: [],
+                    pagination: { page, limit, total: 0, totalPages: 0 }
+                });
+            }
+
+            // Filter these IDs by WordBook
+            const wordsInBook = await prisma.word.findMany({
+                where: {
+                    id: { in: allCandidateIds },
+                    wordBookId: activeWordBookId
+                },
+                select: { id: true }
+            });
+
+            const candidateIds = wordsInBook.map(w => w.id);
+
+            // Re-sort candidateIds based on errorLogs order (recency)
+            const sortedCandidateIds = allCandidateIds.filter(id => candidateIds.includes(id));
+
+            if (sortedCandidateIds.length === 0) {
+                return NextResponse.json({
+                    mistakes: [],
+                    pagination: { page, limit, total: 0, totalPages: 0 }
+                });
+            }
+
+            // 2. Fetch Progress for these candidates to determine status
+            const progressList = await prisma.userProgress.findMany({
+                where: {
+                    wordId: { in: sortedCandidateIds },
+                    userId: userId
+                }
+            });
+
+            const progressMap = new Map();
+            progressList.forEach(p => progressMap.set(p.wordId, p));
+
+            // 3. Filter candidates based on status
+            finalIds = sortedCandidateIds.filter(id => {
+                const p = progressMap.get(id);
+                const consecutive = p?.consecutiveCorrect || 0;
+
+                if (status === 'mastered') {
+                    return consecutive > 0; // Has error history but currently correct streak > 0
+                } else {
+                    return consecutive === 0; // Has error history and currently failing/reset
+                }
             });
         }
-
-        // Filter these IDs by WordBook
-        const wordsInBook = await prisma.word.findMany({
-            where: {
-                id: { in: allCandidateIds },
-                wordBookId: activeWordBookId
-            },
-            select: { id: true }
-        });
-
-        const candidateIds = wordsInBook.map(w => w.id);
-
-        // Re-sort candidateIds based on errorLogs order (recency)
-        const sortedCandidateIds = allCandidateIds.filter(id => candidateIds.includes(id));
-
-        if (sortedCandidateIds.length === 0) {
-            return NextResponse.json({
-                mistakes: [],
-                pagination: { page, limit, total: 0, totalPages: 0 }
-            });
-        }
-
-        // 2. Fetch Progress for these candidates to determine status
-        const progressList = await prisma.userProgress.findMany({
-            where: {
-                wordId: { in: sortedCandidateIds },
-                userId: userId
-            }
-        });
-
-        const progressMap = new Map();
-        progressList.forEach(p => progressMap.set(p.wordId, p));
-
-        // 3. Filter candidates based on status
-        const filteredIds = sortedCandidateIds.filter(id => {
-            const p = progressMap.get(id);
-            const consecutive = p?.consecutiveCorrect || 0;
-
-            if (status === 'mastered') {
-                return consecutive > 0; // Has error history but currently correct streak > 0
-            } else {
-                return consecutive === 0; // Has error history and currently failing/reset
-            }
-        });
 
         // 4. Paginate IDs
-        const total = filteredIds.length;
+        const total = finalIds.length;
         const totalPages = Math.ceil(total / limit);
         const startIndex = (page - 1) * limit;
-        const paginatedIds = filteredIds.slice(startIndex, startIndex + limit);
+        const paginatedIds = finalIds.slice(startIndex, startIndex + limit);
 
         // 5. Fetch details for the page
         // Need error count for these specific words

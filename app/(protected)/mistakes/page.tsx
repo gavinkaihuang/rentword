@@ -19,7 +19,7 @@ export default function MistakeNotebook() {
     const [totalPages, setTotalPages] = useState(1);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
-    const [status, setStatus] = useState<'unmastered' | 'mastered'>('unmastered');
+    const [status, setStatus] = useState<'unmastered' | 'mastered' | 'critical'>('critical');
 
     useEffect(() => {
         fetchMistakes();
@@ -95,6 +95,15 @@ export default function MistakeNotebook() {
 
                 {/* Tabs */}
                 <div className="flex gap-4 mb-6 border-b border-[#cfc9c2]">
+                    <button
+                        onClick={() => { setStatus('critical'); setPage(1); }}
+                        className={`pb-2 px-4 font-bold transition-all border-b-2 ${status === 'critical'
+                            ? 'border-[#8c4351] text-[#8c4351]'
+                            : 'border-transparent text-[#9aa5ce] hover:text-[#565f89]'
+                            }`}
+                    >
+                        🔥 Critical (Unfamiliar & Mistakes)
+                    </button>
                     <button
                         onClick={() => { setStatus('unmastered'); setPage(1); }}
                         className={`pb-2 px-4 font-bold transition-all border-b-2 ${status === 'unmastered'
