@@ -20,6 +20,32 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+
+## 升级系统备份数据
+
+For other servers: Please prevent data loss by:
+
+Backing up your prisma/dev.db file (or your production database) BEFORE running any commands.
+Using npx prisma db push (as suggested in the upgrade doc) is generally safe for SQLite if you are just adding fields, but always backup first.
+Avoiding npx prisma migrate reset or npx prisma db push --force-reset unless you intend to wipe data.
+
+
+## Run this command to reset the admin password to 1234567890:
+
+bash
+npx ts-node scripts/create_admin.ts
+
+## 重置其他用户密码
+Usage:
+
+bash
+npx ts-node scripts/reset_password.ts <username> <new_password>
+Example:
+
+bash
+npx ts-node scripts/reset_password.ts alice 123456
+
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

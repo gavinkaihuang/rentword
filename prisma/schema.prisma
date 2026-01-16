@@ -82,6 +82,8 @@ model ReviewLog {
   
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
+  
+  mistakeType String? // 'SPELLING', 'MEANING', etc.
 }
 
 model StudySession {

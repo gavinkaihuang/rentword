@@ -13,7 +13,7 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '20');
-        const status = searchParams.get('status') || 'unmastered'; // unmastered | mastered
+        const status = searchParams.get('status') || 'unmastered'; // unmastered | mastered | critical | spelling
 
         const cookieStore = await cookies();
         const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
@@ -88,6 +88,36 @@ export async function GET(request: Request) {
 
                 return false;
             });
+
+        } else if (status === 'spelling') {
+            // C. Get Spelling Mistakes
+            const spellingLogs = await prisma.reviewLog.findMany({
+                where: {
+                    userId: userId,
+                    isCorrect: false,
+                    mistakeType: 'SPELLING'
+                },
+                select: { wordId: true },
+                distinct: ['wordId']
+            });
+            const spellingIds = spellingLogs.map(l => l.wordId);
+
+            if (spellingIds.length === 0) {
+                return NextResponse.json({
+                    mistakes: [],
+                    pagination: { page, limit, total: 0, totalPages: 0 }
+                });
+            }
+
+            // Filter by WordBook
+            const wordsInBook = await prisma.word.findMany({
+                where: {
+                    id: { in: spellingIds },
+                    wordBookId: activeWordBookId
+                },
+                select: { id: true }
+            });
+            finalIds = wordsInBook.map(w => w.id);
 
         } else {
             // Existing Logic for 'unmastered' (default) and 'mastered'

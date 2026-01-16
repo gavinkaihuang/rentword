@@ -11,7 +11,7 @@ export async function POST(request: Request) {
         const userId = parseInt(userIdHeader);
 
         const body = await request.json();
-        const { wordId, isCorrect } = body;
+        const { wordId, isCorrect, mistakeType } = body;
 
         if (!wordId || typeof isCorrect !== 'boolean') {
             return NextResponse.json({ error: 'Missing wordId or isCorrect' }, { status: 400 });
@@ -57,7 +57,8 @@ export async function POST(request: Request) {
                 data: {
                     wordId,
                     userId,
-                    isCorrect
+                    isCorrect,
+                    mistakeType: !isCorrect && mistakeType ? mistakeType : null
                 }
             })
         ]);

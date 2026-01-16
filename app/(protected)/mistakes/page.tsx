@@ -19,7 +19,7 @@ export default function MistakeNotebook() {
     const [totalPages, setTotalPages] = useState(1);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
-    const [status, setStatus] = useState<'unmastered' | 'mastered' | 'critical'>('critical');
+    const [status, setStatus] = useState<'unmastered' | 'mastered' | 'critical' | 'spelling'>('critical');
 
     useEffect(() => {
         fetchMistakes();
@@ -121,6 +121,15 @@ export default function MistakeNotebook() {
                             }`}
                     >
                         😎 Resolved (Mastered)
+                    </button>
+                    <button
+                        onClick={() => { setStatus('spelling'); setPage(1); }}
+                        className={`pb-2 px-4 font-bold transition-all border-b-2 ${status === 'spelling'
+                            ? 'border-[#8f5e15] text-[#8f5e15]'
+                            : 'border-transparent text-[#9aa5ce] hover:text-[#565f89]'
+                            }`}
+                    >
+                        🔤 Spelling Errors
                     </button>
                 </div>
 

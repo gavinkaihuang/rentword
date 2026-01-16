@@ -96,10 +96,12 @@ function QuizContent() {
     const [masteredIds, setMasteredIds] = useState<Set<number>>(new Set()); // Completions (Unique IDs)
 
     const [loading, setLoading] = useState(true);
-    const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [validationError, setValidationError] = useState<string | null>(null);
+    const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error'; canRetry?: boolean } | null>(null);
     const [finished, setFinished] = useState(false);
 
-    const [view, setView] = useState<'preview' | 'quiz'>('preview');
+    const [view, setView] = useState<'preview' | 'quiz' | 'spelling'>('preview');
+    const [spellingInput, setSpellingInput] = useState('');
     const [learnedWords, setLearnedWords] = useState<Set<number>>(new Set());
     const [mistakeStatusMap, setMistakeStatusMap] = useState<Record<number, 'resolved' | 'unresolved'>>({});
     const [unfamiliarStatusMap, setUnfamiliarStatusMap] = useState<Record<number, boolean>>({});
@@ -107,6 +109,9 @@ function QuizContent() {
     const [currentTaskId, setCurrentTaskId] = useState<number | null>(null);
     const [hideSpelling, setHideSpelling] = useState(false);
     const [hideMeaning, setHideMeaning] = useState(false);
+
+    // Common derived state
+    const totalCount = previewQuestions.length;
 
     // Initial Load
     useEffect(() => {
@@ -116,6 +121,48 @@ function QuizContent() {
             initTaskFromParams();
         }
     }, [taskIdParam, mode]);
+
+    // Track when feedback changed to prevent immediate dismissal via Enter
+    const feedbackTimestampRef = useRef<number>(0);
+
+    // Enter key confirmation for Error Feedback
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (feedback && feedback.type === 'error' && e.code === 'Enter') {
+                // Grace period check: Ignore Enter if feedback appeared less than 500ms ago
+                if (Date.now() - feedbackTimestampRef.current < 500) {
+                    return;
+                }
+
+                e.preventDefault(); // Prevent default
+                // Trigger the "Confirm & Next" action or "Retry" action
+                if (queue.length > 0) {
+                    if (feedback.canRetry) {
+                        // Retry flow: Clear feedback and input, stay on same word
+                        setFeedback(null);
+                        setSpellingInput('');
+                        document.getElementById('spelling-input')?.focus();
+                    } else {
+                        // Next flow
+                        setFeedback(null);
+                        setSpellingInput('');
+                        const currentWordId = queue[0].word.id;
+                        processNext(currentWordId, false);
+                    }
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [feedback, queue]);
+
+    // Update timestamp when feedback appears
+    useEffect(() => {
+        if (feedback) {
+            feedbackTimestampRef.current = Date.now();
+        }
+    }, [feedback]); // Rerun when feedback or queue changes loops is fine if we check feedback existence
 
     // Time Tracking
     useEffect(() => {
@@ -189,6 +236,13 @@ function QuizContent() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(params)
             });
+
+            if (res.status === 401) {
+                // Redirect to login if unauthorized (session expired/invalid)
+                router.replace('/login');
+                return;
+            }
+
             const data = await res.json();
 
             if (data.task) {
@@ -318,6 +372,31 @@ function QuizContent() {
         setView('quiz');
     };
 
+    const startSpelling = () => {
+        const remaining = previewQuestions.filter(q => !masteredIds.has(q.word.id));
+        if (remaining.length === 0) {
+            setFinished(true);
+            return;
+        }
+
+        // Shuffle
+        const shuffled = [...remaining].map(q => ({ ...q, type: 'standard' as const })).sort(() => Math.random() - 0.5);
+
+        // Init Progress
+        const initProgress: Record<number, { streak: number, required: number }> = {};
+        shuffled.forEach(q => {
+            initProgress[q.word.id] = { streak: 0, required: 1 }; // Spelling is harder, maybe 1 is enough? Let's stick to 2 for consistency or 1 as explicit check? Let's use 1 for now or 2? User didn't specify. Let's use 2.
+            // Actually, for spelling, often 1 correct entry is good enough proof. Let's set req to 1 for spelling.
+            initProgress[q.word.id] = { streak: 0, required: 1 };
+        });
+
+        setQueue(shuffled);
+        setProgress(initProgress);
+        setFinished(false);
+        setSpellingInput('');
+        setView('spelling');
+    };
+
     const handleAnswer = async (option: Option) => {
         if (feedback) return; // Prevent double clicks
 
@@ -356,10 +435,72 @@ function QuizContent() {
         }
     };
 
+    const handleSpellingSubmit = async () => {
+        if (feedback) return;
+        const currentQ = queue[0];
+        const rawTarget = currentQ.word.spelling.trim();
+        const cleanTarget = rawTarget.replace(/[^a-zA-Z]/g, '');
+        const input = spellingInput.trim();
+
+        // Compare clean input vs clean target
+        const isCorrect = input.toLowerCase() === cleanTarget.toLowerCase();
+        const wordId = currentQ.word.id;
+
+        // Submit to Backend
+        fetch('/api/learn/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                wordId,
+                isCorrect,
+                mistakeType: isCorrect ? null : 'SPELLING'
+            })
+        }).catch(e => console.error(e));
+
+        if (isCorrect) {
+            setFeedback({ message: '✅ 正确！', type: 'success' });
+            setTimeout(() => {
+                setSpellingInput('');
+                processNext(wordId, true);
+            }, 1500); // Increased from 500ms
+        } else {
+            setFeedback({
+                message: `❌ 拼写错误。\n\n正确拼写：\n${rawTarget}`,
+                type: 'error',
+                canRetry: true
+            });
+            // Add to mistake notebook via backend submit is done above
+        }
+    };
+
+    const handleSpellingGiveUp = () => {
+        if (feedback) return;
+        const currentQ = queue[0];
+        const targetSpelling = currentQ.word.spelling.trim();
+        const wordId = currentQ.word.id;
+
+        // Submit to Backend as incorrect
+        fetch('/api/learn/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                wordId,
+                isCorrect: false,
+                mistakeType: 'SPELLING'
+            })
+        }).catch(e => console.error(e));
+
+        // Show correct answer and allow retry
+        setFeedback({
+            message: `❌ 正确拼写是：\n\n${targetSpelling}`,
+            type: 'error',
+            canRetry: true
+        });
+    };
+
     const processNext = (wordId: number, isCorrect: boolean) => {
         setFeedback(null);
         const currentQ = queue[0];
-
         const newQueue = [...queue];
         newQueue.shift(); // Remove current
 
@@ -470,6 +611,7 @@ function QuizContent() {
         );
     }
 
+
     if (previewQuestions.length === 0 && view === 'preview') {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-[#e1e2e7]">
@@ -508,6 +650,12 @@ function QuizContent() {
                                     className="bg-[#5a4a78] hover:bg-[#483b60] text-white px-6 py-2 rounded-lg font-bold shadow-lg transition transform hover:scale-105"
                                 >
                                     Start Recitation 🧠
+                                </button>
+                                <button
+                                    onClick={startSpelling}
+                                    className="bg-[#33635c] hover:bg-[#264a44] text-white px-6 py-2 rounded-lg font-bold shadow-lg transition transform hover:scale-105"
+                                >
+                                    Start Spelling ✍️
                                 </button>
                             </div>
                         ) : (
@@ -811,15 +959,218 @@ function QuizContent() {
                         )}
                     </div>
                 </div>
+            </div >
+        );
+    }
+
+    // SPELLING MODE
+    if (view === 'spelling' && queue.length > 0) {
+        const currentQ = queue[0];
+        const correctOption = currentQ.options.find(o => o.isCorrect);
+        const meaning = correctOption?.meaning || currentQ.word.meaning || '';
+        const rawTarget = currentQ.word.spelling.trim();
+        const cleanTarget = rawTarget.replace(/[^a-zA-Z]/g, ''); // Only letters required
+
+        return (
+            <div className="min-h-screen bg-[#e1e2e7] flex flex-col items-center justify-center p-4">
+                <div className="max-w-2xl w-full bg-[#f2f3f5] rounded-3xl shadow-xl p-8 relative overflow-hidden border border-[#c0caf5]">
+                    {/* Header */}
+                    <div className="flex justify-between items-center mb-8 relative z-10">
+                        <span className="text-[#565f89] font-bold text-sm tracking-wider">
+                            SPELLING CHECK ({masteredIds.size} / {totalCount})
+                        </span>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => { setView('preview'); setQueue([]); }}
+                                className="text-[#94a3b8] hover:text-[#565f89]"
+                            >
+                                Quit
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex flex-col items-center gap-8">
+                        {/* 1. Meaning Display */}
+                        <div className="text-center">
+                            <h2 className="text-[#343b58] text-2xl font-bold mb-2">Based on the meaning:</h2>
+                            <div className="text-[#33635c] text-xl font-medium p-4 bg-[#e9f5f4] rounded-xl border border-[#33635c]/20">
+                                <FormattedMeaning text={meaning} spelling="" />
+                            </div>
+                        </div>
+
+                        {/* 2. Spelling Boxes */}
+                        <div className="flex flex-wrap gap-2 justify-center my-4" onClick={() => document.getElementById('spelling-input')?.focus()}>
+                            {(() => {
+                                let letterIdx = 0;
+                                return rawTarget.split('').map((char, idx) => {
+                                    if (/[^a-zA-Z]/.test(char)) {
+                                        // Non-letter separator
+                                        return (
+                                            <div key={idx} className="w-12 h-14 flex items-center justify-center text-2xl font-bold text-[#565f89] select-none">
+                                                {char}
+                                            </div>
+                                        );
+                                    }
+
+                                    const inputChar = spellingInput[letterIdx] || '';
+                                    const isFilled = !!inputChar;
+                                    const currentIdx = letterIdx; // capture for closure if needed, though simple map is fine
+                                    letterIdx++;
+
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className={`w-12 h-14 flex items-center justify-center text-2xl font-mono font-bold rounded-lg border-2 transition-all
+                                                ${isFilled
+                                                    ? 'bg-white border-[#34548a] text-[#343b58] shadow-md transform -translate-y-1'
+                                                    : 'bg-gray-100 border-gray-300 text-transparent'
+                                                }
+                                            `}
+                                        >
+                                            {inputChar}
+                                        </div>
+                                    );
+                                });
+                            })()}
+                        </div>
+
+                        {/* Hidden Input for Keyboard capture */}
+                        <input
+                            id="spelling-input"
+                            type="text"
+                            className="opacity-0 absolute top-0 left-0 w-full h-full cursor-default"
+                            value={spellingInput}
+                            autoFocus
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            spellCheck="false"
+                            onChange={(e) => {
+                                if (feedback) return; // Locked during feedback
+                                const val = e.target.value;
+                                // Only allow letters, max length = cleanTarget length
+                                if (val.length <= cleanTarget.length && /^[a-zA-Z]*$/.test(val)) {
+                                    setSpellingInput(val);
+                                }
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleSpellingSubmit();
+                                } else if (e.key === '?') {
+                                    e.preventDefault();
+                                    handleSpellingGiveUp();
+                                }
+                            }}
+                        />
+
+                        {/* Feedback Overlay */}
+                        {feedback && (
+                            <div className={`absolute inset-0 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm z-50 rounded-3xl animate-fadeIn`}>
+                                <div className={`bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center transform transition-all scale-100`}>
+                                    <div className="text-4xl mb-4">{feedback.type === 'success' ? '🎉' : '🤔'}</div>
+                                    <h3 className={`text-xl font-bold mb-2 ${feedback.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+                                        {feedback.type === 'success' ? 'Correct!' : 'Incorrect'}
+                                    </h3>
+                                    <p className="whitespace-pre-wrap text-gray-600 mb-6">{feedback.message.replace('✅ 正确！', '').replace('❌ 错误。\n\n', '').replace('❌ 拼写错误。\n\n', '')}</p>
+
+                                    {feedback.type === 'error' && (
+                                        <button
+                                            onClick={() => {
+                                                if (feedback.canRetry) {
+                                                    setFeedback(null);
+                                                    setSpellingInput('');
+                                                    document.getElementById('spelling-input')?.focus();
+                                                } else {
+                                                    setFeedback(null);
+                                                    setSpellingInput('');
+                                                    const currentQ = queue[0];
+                                                    processNext(currentQ.word.id, false);
+                                                }
+                                            }}
+                                            className="bg-[#34548a] text-white px-6 py-2 rounded-lg hover:bg-[#2a4470] w-full font-bold"
+                                        >
+                                            {feedback.canRetry ? 'Practice (Retry)' : 'Confirm & Next →'}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Instructions & Actions */}
+                        <div className="flex flex-col items-center gap-4 mt-4 relative z-10">
+                            <p className="text-[#9aa5ce] text-sm">
+                                Type letters only.
+                            </p>
+                            <button
+                                onClick={handleSpellingGiveUp}
+                                className="text-[#34548a] font-bold py-2 px-4 rounded-lg hover:bg-[#34548a]/10 transition text-sm flex items-center gap-2"
+                                title="Press '?' to give up"
+                            >
+                                🤷 I don't know <span className="text-xs bg-gray-200 px-1.5 py-0.5 rounded text-gray-500 font-mono">?</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         );
     }
+
+    // Auto-check effect for spelling
+    useEffect(() => {
+        if (view === 'spelling' && queue.length > 0 && !feedback) {
+            const rawTarget = queue[0].word.spelling.trim();
+            const cleanTarget = rawTarget.replace(/[^a-zA-Z]/g, '');
+
+            if (spellingInput.length === cleanTarget.length) {
+                // Determine correctness immediately
+                const isCorrect = spellingInput.toLowerCase() === cleanTarget.toLowerCase();
+
+                // Small delay to let the user see the last letter typed
+                const timer = setTimeout(() => {
+                    // Call the submit logic
+                    // We need to duplicate the logic of handleSpellingSubmit here because handleSpellingSubmit relies on state 'spellingInput'
+                    // which matches 'spellingInput' dependency here.
+
+                    const currentQ = queue[0];
+                    const wordId = currentQ.word.id;
+
+                    fetch('/api/learn/submit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            wordId,
+                            isCorrect,
+                            mistakeType: isCorrect ? null : 'SPELLING'
+                        })
+                    }).catch(e => console.error(e));
+
+                    if (isCorrect) {
+                        setFeedback({ message: '✅ 正确！', type: 'success' });
+                        setTimeout(() => {
+                            setSpellingInput('');
+                            processNext(wordId, true);
+                        }, 1500);
+                    } else {
+                        setFeedback({
+                            message: `❌ 拼写错误。\n\n正确拼写：\n${rawTarget}`,
+                            type: 'error',
+                            canRetry: true
+                        });
+                    }
+
+                }, 300);
+
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [spellingInput, view, queue, feedback]);
+
 
     // QUIZ MODE
     if (queue.length === 0) return <div>Loading next card...</div>; // Should trigger finished if empty
 
     const currentQ = queue[0];
-    const totalCount = previewQuestions.length; // Approximate total
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-[#e1e2e7] p-4">

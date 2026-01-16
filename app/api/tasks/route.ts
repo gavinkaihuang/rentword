@@ -417,6 +417,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ task });
 
     } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            if (error.code === 'P2003') {
+                // Quietly handle User Not Found (likely stale token)
+                return NextResponse.json({ error: 'User not found. Please log in again.' }, { status: 401 });
+            }
+        }
         console.error('Error creating task:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
