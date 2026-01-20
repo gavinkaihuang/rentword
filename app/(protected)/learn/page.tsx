@@ -300,6 +300,14 @@ function QuizContent() {
         }
     }
 
+    const resetSpellingProgress = (wordId: number) => {
+        const required = Math.floor(Math.random() * 2) + 2; // Random 2 or 3
+        setProgress(prev => ({
+            ...prev,
+            [wordId]: { streak: 0, required }
+        }));
+    };
+
     const startQuiz = () => {
         // 1. Filter out mastered words from previewQuestions
         const remaining = previewQuestions.filter(q => !masteredIds.has(q.word.id));
@@ -385,9 +393,8 @@ function QuizContent() {
         // Init Progress
         const initProgress: Record<number, { streak: number, required: number }> = {};
         shuffled.forEach(q => {
-            initProgress[q.word.id] = { streak: 0, required: 1 }; // Spelling is harder, maybe 1 is enough? Let's stick to 2 for consistency or 1 as explicit check? Let's use 1 for now or 2? User didn't specify. Let's use 2.
-            // Actually, for spelling, often 1 correct entry is good enough proof. Let's set req to 1 for spelling.
-            initProgress[q.word.id] = { streak: 0, required: 1 };
+            // Randomly require 2 or 3 consecutive correct answers
+            initProgress[q.word.id] = { streak: 0, required: Math.floor(Math.random() * 2) + 2 };
         });
 
         setQueue(shuffled);
@@ -479,6 +486,11 @@ function QuizContent() {
         const targetSpelling = currentQ.word.spelling.trim();
         const wordId = currentQ.word.id;
 
+        // Reset progress on Give Up
+        if (view === 'spelling') {
+            resetSpellingProgress(wordId);
+        }
+
         // Submit to Backend as incorrect
         fetch('/api/learn/submit', {
             method: 'POST',
@@ -542,9 +554,26 @@ function QuizContent() {
                 saveTaskProgress(newMastered, false);
             }
 
+            // If we failed, random reset requirement?
+            // For standard quiz, maybe we keep 3?
+            // For spelling, we handled resetSpellingProgress separately eagerly.
+            // But if processNext is called with incorrect, we should fallback to default logic if not already handled.
+            // However, processNext(..., false) is typically called when "Confirm & Next" is clicked AFTER feedback.
+            // So the 'reset' might have already happened eagerly in useEffect or GiveUp.
+            // Let's just update streak to 0 here to be safe and ensure consistent state,
+            // preserving 'required' if it exists, or defaulting.
+
+            // Wait, if it was spelling mode, we likely already reset the progress eagerly to enforce the rule.
+            // If we reset here again with a default, we might overwrite the 'required' we just set randomly.
+            // So we should preserve 'required' from existing progress if possible.
+
+            const nextRequired = view === 'spelling'
+                ? (currentProgress.required || Math.floor(Math.random() * 2) + 2)
+                : 3;
+
             setProgress(prev => ({
                 ...prev,
-                [wordId]: { streak: 0, required: 3 }
+                [wordId]: { streak: 0, required: nextRequired }
             }));
 
             const insertAt = Math.min(newQueue.length, Math.floor(Math.random() * 4) + 2);
@@ -585,6 +614,61 @@ function QuizContent() {
         else newLearned.add(id);
         setLearnedWords(newLearned);
     };
+
+    // Auto-check effect for spelling
+    useEffect(() => {
+        if (view === 'spelling' && queue.length > 0 && !feedback) {
+            const rawTarget = queue[0].word.spelling.trim();
+            const cleanTarget = rawTarget.replace(/[^a-zA-Z]/g, '');
+
+            if (spellingInput.length === cleanTarget.length) {
+                // Determine correctness immediately
+                const isCorrect = spellingInput.toLowerCase() === cleanTarget.toLowerCase();
+
+                // Small delay to let the user see the last letter typed
+                const timer = setTimeout(() => {
+                    // Call the submit logic
+                    // We need to duplicate the logic of handleSpellingSubmit here because handleSpellingSubmit relies on state 'spellingInput'
+                    // which matches 'spellingInput' dependency here.
+
+                    const currentQ = queue[0];
+                    const wordId = currentQ.word.id;
+
+                    fetch('/api/learn/submit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            wordId,
+                            isCorrect,
+                            mistakeType: isCorrect ? null : 'SPELLING'
+                        })
+                    }).catch(e => console.error(e));
+
+                    if (isCorrect) {
+                        setFeedback({ message: '✅ 正确！', type: 'success' });
+                        setTimeout(() => {
+                            setSpellingInput('');
+                            processNext(wordId, true);
+                        }, 1500);
+                    } else {
+                        // Reset progress eagerly on mistake
+                        if (view === 'spelling') {
+                            resetSpellingProgress(wordId);
+                        }
+
+                        setFeedback({
+                            message: `❌ 拼写错误。\n\n正确拼写：\n${rawTarget}`,
+                            type: 'error',
+                            canRetry: true
+                        });
+                    }
+
+                }, 300);
+
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [spellingInput, view, queue, feedback]);
 
     if (loading) return <div className="p-10 text-center">Loading task...</div>;
 
@@ -1116,55 +1200,7 @@ function QuizContent() {
         );
     }
 
-    // Auto-check effect for spelling
-    useEffect(() => {
-        if (view === 'spelling' && queue.length > 0 && !feedback) {
-            const rawTarget = queue[0].word.spelling.trim();
-            const cleanTarget = rawTarget.replace(/[^a-zA-Z]/g, '');
 
-            if (spellingInput.length === cleanTarget.length) {
-                // Determine correctness immediately
-                const isCorrect = spellingInput.toLowerCase() === cleanTarget.toLowerCase();
-
-                // Small delay to let the user see the last letter typed
-                const timer = setTimeout(() => {
-                    // Call the submit logic
-                    // We need to duplicate the logic of handleSpellingSubmit here because handleSpellingSubmit relies on state 'spellingInput'
-                    // which matches 'spellingInput' dependency here.
-
-                    const currentQ = queue[0];
-                    const wordId = currentQ.word.id;
-
-                    fetch('/api/learn/submit', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            wordId,
-                            isCorrect,
-                            mistakeType: isCorrect ? null : 'SPELLING'
-                        })
-                    }).catch(e => console.error(e));
-
-                    if (isCorrect) {
-                        setFeedback({ message: '✅ 正确！', type: 'success' });
-                        setTimeout(() => {
-                            setSpellingInput('');
-                            processNext(wordId, true);
-                        }, 1500);
-                    } else {
-                        setFeedback({
-                            message: `❌ 拼写错误。\n\n正确拼写：\n${rawTarget}`,
-                            type: 'error',
-                            canRetry: true
-                        });
-                    }
-
-                }, 300);
-
-                return () => clearTimeout(timer);
-            }
-        }
-    }, [spellingInput, view, queue, feedback]);
 
 
     // QUIZ MODE
