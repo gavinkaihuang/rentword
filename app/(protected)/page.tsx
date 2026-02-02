@@ -235,6 +235,18 @@ export default function Home() {
           </button>
         </div>
 
+        {/* SM-2 Spaced Repetition (New Mode) */}
+        <div className="bg-[#d5d6db] p-6 rounded-xl shadow-lg border border-[#c0caf5] flex flex-col">
+          <h2 className="text-2xl font-semibold mb-4 text-[#343b58]">Memory Master</h2>
+          <p className="text-[#565f89] mb-6 flex-grow">Smart spaced repetition based on Ebbinghaus curve (SM-2).</p>
+          <button
+            onClick={() => router.push('/study')}
+            className="w-full bg-[#ccece6] hover:bg-[#a8dadc] text-[#34548a] font-bold py-3 rounded-lg mt-auto transition shadow-sm"
+          >
+            Start Memory
+          </button>
+        </div>
+
         {/* Mode 3 */}
         <div className="bg-[#d5d6db] p-6 rounded-xl shadow-lg border border-[#c0caf5] flex flex-col">
           <h2 className="text-2xl font-semibold mb-4 text-[#343b58]">Random Practice</h2>

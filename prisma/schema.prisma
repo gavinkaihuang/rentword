@@ -74,6 +74,10 @@ model UserProgress {
   lastReviewed       DateTime?
   consecutiveCorrect Int       @default(0)
   isUnfamiliar       Boolean   @default(false)
+  
+  // SM-2 Algorithm Fields
+  interval           Float     @default(0) // Days accessing the word
+  easinessFactor     Float     @default(2.5) // Initial difficulty multiplier
 
   userId Int // Required now
   user   User @relation(fields: [userId], references: [id])

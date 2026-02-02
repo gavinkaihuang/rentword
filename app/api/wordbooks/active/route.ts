@@ -2,12 +2,23 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
+import prisma from '@/lib/prisma';
+
 export async function GET() {
     const cookieStore = await cookies();
     const activeId = cookieStore.get('active_wordbook_id')?.value;
 
-    // Default to 1 if not set
-    const activeWordBookId = activeId ? parseInt(activeId) : 1;
+    let activeWordBookId = activeId ? parseInt(activeId) : 1;
+
+    // Check validity logic similar to study route
+    if (activeWordBookId <= 1) {
+        // Try to find if book 1 actually exists, or get first available
+        const bookCount = await prisma.wordBook.count({ where: { id: activeWordBookId } });
+        if (bookCount === 0) {
+            const firstBook = await prisma.wordBook.findFirst({ orderBy: { id: 'asc' }, select: { id: true } });
+            if (firstBook) activeWordBookId = firstBook.id;
+        }
+    }
 
     return NextResponse.json({ activeWordBookId });
 }
