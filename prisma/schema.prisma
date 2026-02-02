@@ -37,6 +37,12 @@ model Word {
   mnemonic    String? // 记忆辅助
   story       String? // 小故事
 
+  // AI Dimension Columns
+  clusterTag    String? // Semantic Cluster Idea
+  synonymGroup  String? // ID or Keyword for synonym grouping
+  antonym       String? // Antonym word
+  usageDomain   String? // Tech, Academic, Daily, etc.
+
   orderIndex  Int
   
   wordBookId  Int?
