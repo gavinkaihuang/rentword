@@ -10,10 +10,10 @@ datasource db {
 model User {
   id        Int      @id @default(autoincrement())
   username  String   @unique
-  password  String   // Hashed
+  password  String // Hashed
   role      String   @default("USER") // ADMIN, USER
   createdAt DateTime @default(now())
-  
+
   tasks         Task[]
   progress      UserProgress[]
   reviewLogs    ReviewLog[]
@@ -21,33 +21,35 @@ model User {
 }
 
 model Word {
-  id          Int      @id @default(autoincrement())
-  spelling    String
-  meaning     String
-  phonetic    String?
-  grammar     String?
-  example     String?
-  content     String? // Rich text content (Markdown)
-  
+  id       Int     @id @default(autoincrement())
+  spelling String
+  meaning  String
+  phonetic String?
+  grammar  String?
+  example  String?
+  content  String? // Rich text content (Markdown)
+
   // New structured fields
-  roots       String? // 词根分析
-  affixes     String? // 词缀分析
-  history     String? // 发展历史和文化背景
-  variations  String? // 单词变形
-  mnemonic    String? // 记忆辅助
-  story       String? // 小故事
+  roots      String? // 词根分析
+  affixes    String? // 词缀分析
+  history    String? // 发展历史和文化背景
+  variations String? // 单词变形
+  mnemonic   String? // 记忆辅助
+  story      String? // 小故事
 
   // AI Dimension Columns
-  clusterTag    String? // Semantic Cluster Idea
-  synonymGroup  String? // ID or Keyword for synonym grouping
-  antonym       String? // Antonym word
-  usageDomain   String? // Tech, Academic, Daily, etc.
+  clusterTag   String? // Semantic Cluster Idea
+  synonymGroup String? // ID or Keyword for synonym grouping
+  antonym      String? // Antonym word
+  usageDomain  String? // Tech, Academic, Daily, etc.
 
-  orderIndex  Int
-  
-  wordBookId  Int?
-  wordBook    WordBook? @relation(fields: [wordBookId], references: [id])
-  
+  confusables String? // JSON string of confusable words array
+
+  orderIndex Int
+
+  wordBookId Int?
+  wordBook   WordBook? @relation(fields: [wordBookId], references: [id])
+
   userProgress UserProgress[]
   reviewLogs   ReviewLog[]
 }
@@ -56,11 +58,11 @@ model WordBook {
   id        Int      @id @default(autoincrement())
   name      String
   createdAt DateTime @default(now())
-  
-  // Configuration
-  displayMode Int    @default(1) // 1: Standard (Light), 2: Enhanced (Rich)
 
-  words     Word[]
+  // Configuration
+  displayMode Int @default(1) // 1: Standard (Light), 2: Enhanced (Rich)
+
+  words Word[]
 }
 
 model UserProgress {
@@ -72,9 +74,9 @@ model UserProgress {
   lastReviewed       DateTime?
   consecutiveCorrect Int       @default(0)
   isUnfamiliar       Boolean   @default(false)
-  
-  userId             Int       // Required now
-  user               User      @relation(fields: [userId], references: [id])
+
+  userId Int // Required now
+  user   User @relation(fields: [userId], references: [id])
 
   @@unique([userId, wordId])
 }
@@ -85,46 +87,46 @@ model ReviewLog {
   word      Word     @relation(fields: [wordId], references: [id])
   isCorrect Boolean
   createdAt DateTime @default(now())
-  
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
-  
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
   mistakeType String? // 'SPELLING', 'MEANING', etc.
 }
 
 model StudySession {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
-  duration  Int      // Seconds
-  type      String   // 'LEARN' or 'EXERCISE'
-  
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
+  duration  Int // Seconds
+  type      String // 'LEARN' or 'EXERCISE'
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
 }
 
 model Task {
-  id            Int      @id @default(autoincrement())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Configuration
-  mode          String   // 'RANGE', 'RANDOM', 'REVIEW', etc.
-  description   String   // Display title
-  
+  mode        String // 'RANGE', 'RANDOM', 'REVIEW', etc.
+  description String // Display title
+
   // Snapshot State (JSON)
   // Stores: { wordIds: number[], options: any }
-  content       String   
-  
+  content String
+
   // Progress
-  totalCount    Int
-  completedCount Int     @default(0)
-  
+  totalCount     Int
+  completedCount Int @default(0)
+
   // Detailed Progress (JSON)
   // Stores: { masteredIds: number[] }
-  progress      String   @default("{}")
-  
-  status        String   @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED
-  
-  userId        Int
-  user          User     @relation(fields: [userId], references: [id])
+  progress String @default("{}")
+
+  status String @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
 }
