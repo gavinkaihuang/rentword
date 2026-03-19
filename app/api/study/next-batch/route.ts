@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { formatWordForTask } from '@/lib/word-utils';
+import { getActiveWordBookId } from '@/lib/active-wordbook';
 
 type ProgressCompat = {
     word: unknown;
@@ -25,13 +26,7 @@ export async function GET(request: Request) {
     }
 
     const cookieStore = await cookies();
-    let activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '0');
-
-    // Fallback: If no cookie or ID is 0/1 (potentially invalid if books rebuilt), find first available
-    if (activeWordBookId <= 1) {
-        const firstBook = await prisma.wordBook.findFirst({ orderBy: { id: 'asc' } });
-        if (firstBook) activeWordBookId = firstBook.id;
-    }
+    const activeWordBookId = await getActiveWordBookId(cookieStore);
 
     try {
         const now = new Date();

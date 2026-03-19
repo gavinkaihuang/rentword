@@ -8,19 +8,38 @@ export async function GET() {
     const cookieStore = await cookies();
     const activeId = cookieStore.get('active_wordbook_id')?.value;
 
-    let activeWordBookId = activeId ? parseInt(activeId) : 1;
+    let activeWordBookId = activeId ? parseInt(activeId, 10) : NaN;
+    let needsSetCookie = false;
 
-    // Check validity logic similar to study route
-    if (activeWordBookId <= 1) {
-        // Try to find if book 1 actually exists, or get first available
-        const bookCount = await prisma.wordBook.count({ where: { id: activeWordBookId } });
-        if (bookCount === 0) {
+    if (Number.isNaN(activeWordBookId) || activeWordBookId <= 0) {
+        const firstBook = await prisma.wordBook.findFirst({ orderBy: { id: 'asc' }, select: { id: true } });
+        activeWordBookId = firstBook?.id ?? 1;
+        needsSetCookie = true;
+    } else {
+        const existingBook = await prisma.wordBook.findUnique({
+            where: { id: activeWordBookId },
+            select: { id: true }
+        });
+
+        if (!existingBook) {
             const firstBook = await prisma.wordBook.findFirst({ orderBy: { id: 'asc' }, select: { id: true } });
-            if (firstBook) activeWordBookId = firstBook.id;
+            activeWordBookId = firstBook?.id ?? 1;
+            needsSetCookie = true;
         }
     }
 
-    return NextResponse.json({ activeWordBookId });
+    const response = NextResponse.json({ activeWordBookId });
+
+    if (needsSetCookie) {
+        response.cookies.set('active_wordbook_id', activeWordBookId.toString(), {
+            httpOnly: true,
+            path: '/',
+            sameSite: 'strict',
+            maxAge: 60 * 60 * 24 * 365
+        });
+    }
+
+    return response;
 }
 
 export async function POST(request: Request) {

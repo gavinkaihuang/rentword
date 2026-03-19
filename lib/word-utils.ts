@@ -1,4 +1,3 @@
-
 export function formatWordForTask(word: any, displayMode: number = 1) {
     // DEBUG: Log the word content being processed
     if (word.spelling === 'about' || Math.random() < 0.05) { // Limit noise, ensure 'about' is caught

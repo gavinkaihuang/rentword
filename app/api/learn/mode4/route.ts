@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { formatWordForTask } from '@/lib/word-utils';
+import { getActiveWordBookId } from '@/lib/active-wordbook';
 
 export async function GET(request: Request) {
     try {
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
         const wordIds = logs.map(log => log.wordId);
 
         const cookieStore = await cookies();
-        const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
+        const activeWordBookId = await getActiveWordBookId(cookieStore);
 
         const words = await prisma.word.findMany({
             where: {

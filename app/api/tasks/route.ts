@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { formatWordForTask } from '@/lib/word-utils';
+import { getActiveWordBookId } from '@/lib/active-wordbook';
 
 export async function POST(request: Request) {
     try {
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
         const { mode, ...params } = body;
 
         const cookieStore = await cookies();
-        let activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
+        let activeWordBookId = await getActiveWordBookId(cookieStore);
 
         if (params.wordBookId) {
             const parsedId = parseInt(params.wordBookId);

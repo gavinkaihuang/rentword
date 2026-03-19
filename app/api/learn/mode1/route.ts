@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { formatWordForTask } from '@/lib/word-utils';
+import { getActiveWordBookId } from '@/lib/active-wordbook';
 
 function pickRandomDistinct<T>(items: T[], count: number): T[] {
     if (items.length <= count) return [...items];
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '10');
 
     const cookieStore = await cookies();
-    const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
+    const activeWordBookId = await getActiveWordBookId(cookieStore);
 
     if (!fromWord || !toWord) {
         return NextResponse.json({ error: 'Missing from/to parameters' }, { status: 400 });

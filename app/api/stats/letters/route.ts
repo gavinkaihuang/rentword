@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { cookies } from 'next/headers';
+import { getActiveWordBookId } from '@/lib/active-wordbook';
 
 export async function GET(request: Request) {
     try {
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
         const requestedBookId = searchParams.get('wordBookId');
 
         const cookieStore = await cookies();
-        const cookieBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
+        const cookieBookId = await getActiveWordBookId(cookieStore);
 
         const activeWordBookId = requestedBookId ? parseInt(requestedBookId) : cookieBookId;
 

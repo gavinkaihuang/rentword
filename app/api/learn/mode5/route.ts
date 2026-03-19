@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { formatWordForTask } from '@/lib/word-utils';
+import { getActiveWordBookId } from '@/lib/active-wordbook';
 
 export async function GET(request: Request) {
     try {
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
         });
 
         const cookieStore = await cookies();
-        const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
+        const activeWordBookId = await getActiveWordBookId(cookieStore);
 
         // Reuse logic for generating questions with distractors
         const questions = await Promise.all(words.map(async (word) => {

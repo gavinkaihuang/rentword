@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { cookies } from 'next/headers';
+import { getActiveWordBookId } from '@/lib/active-wordbook';
 
 export async function GET(request: Request) {
     try {
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
         const userId = userIdHeader ? parseInt(userIdHeader) : 0; // Default to 0 if not logged in (e.g. strict mode handled by middleware)
 
         const cookieStore = await cookies();
-        const activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '1');
+        const activeWordBookId = await getActiveWordBookId(cookieStore);
 
         if (!letter || letter.length !== 1) {
             return NextResponse.json({ error: 'Invalid letter parameter' }, { status: 400 });
