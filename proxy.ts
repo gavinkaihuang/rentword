@@ -11,7 +11,6 @@ const PROTECTED_ROUTES = [
     '/calendar'
 ];
 
-// API routes that require auth (almost all except login)
 const PROTECTED_API_PREFIXES = [
     '/api/learn',
     '/api/mistakes',
@@ -25,10 +24,9 @@ const PROTECTED_API_PREFIXES = [
     '/api/log-time'
 ];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
-    // Check if path is protected
     const isProtectedPage = PROTECTED_ROUTES.some(route => pathname.startsWith(route));
     const isProtectedApi = PROTECTED_API_PREFIXES.some(prefix => pathname.startsWith(prefix));
 
@@ -47,7 +45,6 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(loginUrl);
     }
 
-    // Role check for admin
     if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
         if (session.role !== 'ADMIN') {
             if (isProtectedApi) {
@@ -57,7 +54,6 @@ export async function middleware(request: NextRequest) {
         }
     }
 
-    // Inject user info into headers for downstream use
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set('x-user-id', String(session.userId));
     requestHeaders.set('x-user-role', String(session.role));
