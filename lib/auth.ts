@@ -2,10 +2,22 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-const SECRET_KEY = process.env.JWT_SECRET_KEY || 'your-secret-key-at-least-32-chars-long';
-const key = new TextEncoder().encode(SECRET_KEY);
+function getJwtKey() {
+    const secret = process.env.JWT_SECRET_KEY;
+
+    if (!secret) {
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error('JWT_SECRET_KEY is required in production');
+        }
+        // Dev-only fallback for local setup convenience.
+        return new TextEncoder().encode('dev-only-insecure-secret-key-change-me');
+    }
+
+    return new TextEncoder().encode(secret);
+}
 
 export async function signToken(payload: any) {
+    const key = getJwtKey();
     return await new SignJWT(payload)
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt()
@@ -15,6 +27,7 @@ export async function signToken(payload: any) {
 
 export async function verifyToken(token: string) {
     try {
+        const key = getJwtKey();
         const { payload } = await jwtVerify(token, key);
         return payload;
     } catch (error) {

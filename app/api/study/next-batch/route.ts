@@ -8,8 +8,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '10');
 
-    // Default user ID for now, should be from session
-    const userId = 1;
+    const userIdHeader = request.headers.get('x-user-id');
+    if (!userIdHeader) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = parseInt(userIdHeader);
+    if (Number.isNaN(userId)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const cookieStore = await cookies();
     let activeWordBookId = parseInt(cookieStore.get('active_wordbook_id')?.value || '0');

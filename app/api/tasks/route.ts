@@ -483,15 +483,28 @@ function sanitizeMeaning(meaning: string, spelling: string) {
     }
 }
 
+function pickRandomDistinct<T>(items: T[], count: number): T[] {
+    if (items.length <= count) return [...items];
+
+    const copy = [...items];
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+
+    return copy.slice(0, count);
+}
+
 // Helper to generate questions with options
 async function generateQuestions(words: any[], activeWordBookId: number, displayMode: number = 1) {
-    return await Promise.all(words.map(async (word) => {
-        const distractors = await prisma.$queryRaw<Array<{ meaning: String, spelling: String }>>`
-            SELECT meaning, spelling FROM "Word" 
-            WHERE id != ${word.id} AND wordBookId = ${activeWordBookId}
-            ORDER BY RANDOM() 
-            LIMIT 3
-        `;
+    const distractorPool = await prisma.word.findMany({
+        where: { wordBookId: activeWordBookId },
+        select: { id: true, meaning: true, spelling: true }
+    });
+
+    return words.map((word) => {
+        const candidates = distractorPool.filter(item => item.id !== word.id);
+        const distractors = pickRandomDistinct(candidates, 3);
 
         const options = [
             {
@@ -501,7 +514,7 @@ async function generateQuestions(words: any[], activeWordBookId: number, display
             },
             ...distractors.map(d => ({
                 label: 'Option',
-                value: sanitizeMeaning(d.meaning as string, d.spelling as string),
+                value: sanitizeMeaning(d.meaning, d.spelling),
                 isCorrect: false
             }))
         ];
@@ -511,5 +524,5 @@ async function generateQuestions(words: any[], activeWordBookId: number, display
             word: formatWordForTask(word, displayMode),
             options: shuffledOptions.map(o => ({ meaning: o.value, isCorrect: o.isCorrect }))
         };
-    }));
+    });
 }

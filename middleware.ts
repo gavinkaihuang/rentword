@@ -16,6 +16,7 @@ const PROTECTED_API_PREFIXES = [
     '/api/learn',
     '/api/mistakes',
     '/api/stats',
+    '/api/study',
     '/api/tasks',
     '/api/wordbooks',
     '/api/admin',

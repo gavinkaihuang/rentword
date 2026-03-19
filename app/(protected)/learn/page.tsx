@@ -2,6 +2,8 @@
 
 import { useState, useEffect, Suspense, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { Volume2 } from 'lucide-react';
+import { useWordAudio } from '@/lib/hooks/useWordAudio';
 
 interface Option {
     meaning: string;
@@ -109,6 +111,9 @@ function QuizContent() {
     const [currentTaskId, setCurrentTaskId] = useState<number | null>(null);
     const [hideSpelling, setHideSpelling] = useState(false);
     const [hideMeaning, setHideMeaning] = useState(false);
+    const { play, playingWord } = useWordAudio();
+
+    const currentQ = queue[0] ?? null;
 
     // Common derived state
     const totalCount = previewQuestions.length;
@@ -181,6 +186,14 @@ function QuizContent() {
             }
         };
     }, [view]);
+
+    useEffect(() => {
+        if (view !== 'quiz' || !currentQ?.word.spelling) {
+            return;
+        }
+
+        play(currentQ.word.spelling);
+    }, [view, currentQ?.word.id, currentQ?.word.spelling, play]);
 
     const checkMistakes = async (questions: Question[]) => {
         if (questions.length === 0) return;
@@ -1206,8 +1219,6 @@ function QuizContent() {
     // QUIZ MODE
     if (queue.length === 0) return <div>Loading next card...</div>; // Should trigger finished if empty
 
-    const currentQ = queue[0];
-
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-[#e1e2e7] p-4">
             <div className="bg-[#f2f3f5] p-8 rounded-2xl shadow-xl w-full max-w-2xl border border-[#c0caf5] relative">
@@ -1244,7 +1255,17 @@ function QuizContent() {
                         {currentQ.type === 'reverse' ? currentQ.reversePrompt : currentQ.word.spelling}
                     </h1>
                     {currentQ.type !== 'reverse' && currentQ.word.phonetic && (
-                        <div className="text-[#565f89] text-xl mt-2 font-mono">{currentQ.word.phonetic}</div>
+                        <div className="flex items-center justify-center gap-2 text-xl mt-2 font-mono">
+                            <span className="text-[#565f89]">{currentQ.word.phonetic}</span>
+                            <button
+                                onClick={() => play(currentQ.word.spelling)}
+                                className={`transition-colors ${playingWord === currentQ.word.spelling ? 'text-blue-500' : 'text-gray-400 hover:text-blue-500'}`}
+                                title="Play Pronunciation"
+                                aria-label="Play Pronunciation"
+                            >
+                                <Volume2 className="w-5 h-5" />
+                            </button>
+                        </div>
                     )}
                 </div>
 

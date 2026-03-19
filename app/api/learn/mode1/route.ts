@@ -3,6 +3,18 @@ import prisma from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { formatWordForTask } from '@/lib/word-utils';
 
+function pickRandomDistinct<T>(items: T[], count: number): T[] {
+    if (items.length <= count) return [...items];
+
+    const copy = [...items];
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+
+    return copy.slice(0, count);
+}
+
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const fromWord = searchParams.get('from');
@@ -53,24 +65,14 @@ export async function GET(request: Request) {
             take: limit, // Pagination or batching
         });
 
-        // 3. Generate distractors for each word
-        // We need random meanings. Efficient way: get random IDs or fetch a random sample.
-        // For simplicity with 3800 words, we can fetch all IDs and pick random ones, OR fetch a random batch.
+        // 3. Build one distractor pool to avoid per-question DB round-trips
+        const distractorPool = await prisma.word.findMany({
+            select: { id: true, meaning: true }
+        });
 
-        // Let's count total words first
-        const totalWords = await prisma.word.count();
-
-        const questions = await Promise.all(words.map(async (word) => {
-            // Fetch 3 random distractors
-            // Using raw query for random usually, or just picking random IDs in JS helper
-            // SQLite RANDOM(): `SELECT * FROM Word WHERE id != word.id ORDER BY RANDOM() LIMIT 3`
-
-            const distractors = await prisma.$queryRaw<Array<{ meaning: String }>>`
-        SELECT meaning FROM "Word" 
-        WHERE id != ${word.id} 
-        ORDER BY RANDOM() 
-        LIMIT 3
-      `;
+        const questions = words.map((word) => {
+            const candidates = distractorPool.filter(item => item.id !== word.id);
+            const distractors = pickRandomDistinct(candidates, 3);
 
             const options = [
                 { label: 'Correct', value: word.meaning, isCorrect: true },
@@ -85,7 +87,7 @@ export async function GET(request: Request) {
                 word: formatWordForTask(word),
                 options: shuffledOptions.map(o => ({ meaning: o.value, isCorrect: o.isCorrect }))
             };
-        }));
+        });
 
         return NextResponse.json({ questions, nextBatchStart: words[words.length - 1]?.orderIndex + 1 });
 

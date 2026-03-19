@@ -8,6 +8,15 @@ const MIN_EF = 1.3;
 
 export async function POST(request: Request) {
     try {
+        const userIdHeader = request.headers.get('x-user-id');
+        if (!userIdHeader) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        const userId = parseInt(userIdHeader);
+        if (Number.isNaN(userId)) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const body = await request.json();
         const { wordId, quality } = body;
         // Quality: 0 (complete blackout) to 5 (perfect response)
@@ -16,7 +25,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing wordId or quality' }, { status: 400 });
         }
 
-        const userId = 1; // Default user
         const now = new Date();
 
         // 1. Get current progress
