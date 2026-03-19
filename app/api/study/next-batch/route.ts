@@ -4,6 +4,13 @@ import prisma from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { formatWordForTask } from '@/lib/word-utils';
 
+type ProgressCompat = {
+    word: unknown;
+    nextReviewDate: Date | null;
+    interval?: number;
+    easinessFactor?: number;
+};
+
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '10');
@@ -42,15 +49,21 @@ export async function GET(request: Request) {
             orderBy: { nextReviewDate: 'asc' }
         });
 
-        const dueWords = dueProgress.map(p => ({
-            ...formatWordForTask(p.word),
-            _progress: {
-                interval: p.interval,
-                easinessFactor: p.easinessFactor,
-                nextReviewDate: p.nextReviewDate
-            },
-            _isNew: false
-        }));
+        const dueWords = dueProgress.map(p => {
+            // Keep compatibility with environments where Prisma Client types
+            // don't yet include SM-2 fields.
+            const progress = p as unknown as ProgressCompat;
+
+            return {
+                ...formatWordForTask(progress.word),
+                _progress: {
+                    interval: typeof progress.interval === 'number' ? progress.interval : 0,
+                    easinessFactor: typeof progress.easinessFactor === 'number' ? progress.easinessFactor : 2.5,
+                    nextReviewDate: progress.nextReviewDate
+                },
+                _isNew: false
+            };
+        });
 
         // 2. Fetch New Words if limit not reached
         let newWords: any[] = [];
