@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+
+启动程序
+pm2 start npm --name "rentword" -- run start
+
 ## Getting Started
 
 First, run the development server:
